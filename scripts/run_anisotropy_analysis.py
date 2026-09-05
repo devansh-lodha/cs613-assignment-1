@@ -11,7 +11,10 @@ import torch.nn.functional as F
 from tabulate import tabulate
 
 from embedding_gemma.config import ModelConfig
-from embedding_gemma.data import load_stsb_benchmark, load_bpcc_gold_standard
+from embedding_gemma.data import (
+    load_stsb_benchmark,
+    load_bpcc_by_language,
+)
 from embedding_gemma.geometry import (
     LayerGeometryRecord,
     analyze_layer_geometry,
@@ -322,7 +325,7 @@ def generate_cosine_distribution_plots(
 
 
 def main() -> None:
-    """Execute complete layer-wise representation geometry pipeline across multiple models and datasets."""
+    """Execute layer-wise representation geometry analysis."""
     set_seed(42)
 
     output_dir = Path("results")
@@ -332,99 +335,332 @@ def main() -> None:
     print("Multi-Model & Multi-Dataset Layer-Wise Representation Analysis")
     print("=" * 70)
 
-    # Define the 2x2 experimental matrix requested by your teammate
     models_to_test = [
-    "Qwen/Qwen3-Embedding-8B",
-    "google/embeddinggemma-300m",
-    "bert-base-multilingual-cased"
+        "Qwen/Qwen3-Embedding-8B",
+        "google/embeddinggemma-300m",
+        "bert-base-multilingual-cased",
     ]
-    datasets_to_test = {
-        "STS-B": load_stsb_benchmark,
-        "BPCC-Human": load_bpcc_gold_standard,
-    }
 
-    for data_name, data_loader in datasets_to_test.items():
-        print(f"\n[Data] Loading {data_name} dataset...")
-        try:
-            s1_list, s2_list, gold_scores = data_loader()
-        except Exception as e:
-            print(f"     [Warning] Could not load {data_name}: {e}. Skipping.")
-            continue
+    bpcc_languages = [
+        "hin_Deva",
+        "ben_Beng",
+        "guj_Gujr",
+        "tam_Taml",
+        "tel_Telu",
+    ]
 
+    # ================================================================
+    # STS-B ANALYSIS
+    # ================================================================
+
+    print("\n[Data] Loading STS-B dataset...")
+
+    try:
+        s1_list, s2_list, gold_scores = load_stsb_benchmark()
+    except Exception as e:
+        print(f"     [Warning] Could not load STS-B: {e}. Skipping.")
+    else:
         print(f"     Loaded {len(s1_list)} sentence pairs.")
 
-        # Optional: Slice dataset to 1000 pairs during initial testing to save time/compute
-        s1_list, s2_list, gold_scores = s1_list[:1000], s2_list[:1000], gold_scores[:1000]
+        # Limit samples during initial testing.
+        s1_list = s1_list[:1000]
+        s2_list = s2_list[:1000]
+        gold_scores = gold_scores[:1000]
 
         for model_id in models_to_test:
-            print(f"\n----------------------------------------------------------------------")
-            print(f"Evaluating Model: {model_id} on Dataset: {data_name}")
-            print(f"----------------------------------------------------------------------")
+            print("\n" + "-" * 70)
+            print(
+                f"Evaluating Model: {model_id} "
+                "on Dataset: STS-B"
+            )
+            print("-" * 70)
 
-            # Initialize config (ModelConfig is frozen, pass model_id on init)
-            config = ModelConfig(model_id=model_id, task_type="raw", batch_size=8)
+            config = ModelConfig(
+                model_id=model_id,
+                task_type="raw",
+                batch_size=8,
+            )
 
             try:
                 wrapper = EmbeddingGemmaWrapper(config)
             except Exception as e:
-                print(f"     [Error] Failed to initialize {model_id}: {e}")
+                print(
+                    f"     [Error] Failed to initialize "
+                    f"{model_id}: {e}"
+                )
                 continue
 
             print(f"     Compute device:   {wrapper.device}")
             print(f"     Numerical dtype:  {wrapper.dtype}")
 
-            # Extract representations
+            # Extract representations.
             print("     Encoding sentence 1 corpus...")
-            out1 = wrapper.encode(s1_list, return_hidden_states=True, to_cpu=True)
+            out1 = wrapper.encode(
+                s1_list,
+                return_hidden_states=True,
+                to_cpu=True,
+            )
+
             print("     Encoding sentence 2 corpus...")
-            out2 = wrapper.encode(s2_list, return_hidden_states=True, to_cpu=True)
+            out2 = wrapper.encode(
+                s2_list,
+                return_hidden_states=True,
+                to_cpu=True,
+            )
 
-            # Compute metrics
+            # Compute metrics.
             print("     Computing layer-wise geometry metrics...")
-            records = analyze_layer_geometry(out1, out2, gold_scores)
+            records = analyze_layer_geometry(
+                out1,
+                out2,
+                gold_scores,
+            )
 
-            # Create distinct subdirectories for results to prevent file overwrites
             safe_model_name = model_id.replace("/", "_")
-            run_out_dir = output_dir / f"{data_name}_{safe_model_name}"
-            run_out_dir.mkdir(parents=True, exist_ok=True)
+            run_out_dir = (
+                output_dir
+                / f"STSB_{safe_model_name}"
+            )
+            run_out_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
 
-            # Display table summary
+            # Display table summary.
             table_data = [
                 {
                     "Layer": r.layer_name,
-                    "Cosine Cone (↓)": f"{r.cosine_anisotropy:.4f}",
-                    "STS-B Spearman (↑)": f"{r.spearman_correlation:.4f}",
-                    "IsoScore (↑)": f"{r.isoscore:.4f}",
-                    "ID Score (↑)": f"{r.id_score:.4f}",
-                    "Rogue λ₁ Share (↓)": f"{r.rogue_ratio:.4f}",
+                    "Cosine Cone (↓)": (
+                        f"{r.cosine_anisotropy:.4f}"
+                    ),
+                    "Spearman (↑)": (
+                        f"{r.spearman_correlation:.4f}"
+                    ),
+                    "IsoScore (↑)": (
+                        f"{r.isoscore:.4f}"
+                    ),
+                    "ID Score (↑)": (
+                        f"{r.id_score:.4f}"
+                    ),
+                    "Rogue λ₁ Share (↓)": (
+                        f"{r.rogue_ratio:.4f}"
+                    ),
                 }
                 for r in records
             ]
-            print("\n" + tabulate(table_data, headers="keys", tablefmt="github"))
 
-            # Save quantitative and qualitative outputs
-            json_path, csv_path = save_numerical_results(records, run_out_dir)
-            print(f"\nSaved artifacts to: {run_out_dir}")
+            print(
+                "\n"
+                + tabulate(
+                    table_data,
+                    headers="keys",
+                    tablefmt="github",
+                )
+            )
 
-            # Only generate these specific multi-layer progression plots for Gemma
-            # (since BERT has 12 layers instead of 24, avoiding index out of range)
+            # Save results.
+            save_numerical_results(
+                records,
+                run_out_dir,
+            )
+
+            # Generate visualizations.
             if "embeddinggemma" in model_id.lower():
-                generate_trajectory_plots(records, run_out_dir / "cone_analysis.png")
-                generate_3d_geometry_plots(out1, out2, run_out_dir / "cone_3d_progression.png")
-                generate_cosine_distribution_plots(out1, out2, run_out_dir / "cosine_distributions.png")
-            else:
-                print("     [Notice] Skipping 24-layer specific trajectory plots for non-Gemma control model.")
+                generate_trajectory_plots(
+                    records,
+                    run_out_dir / "cone_analysis.png",
+                )
 
-                # Clear VRAM before loading the next model
-                del wrapper
-                del out1
-                del out2
+                generate_3d_geometry_plots(
+                    out1,
+                    out2,
+                    run_out_dir
+                    / "cone_3d_progression.png",
+                )
+
+                generate_cosine_distribution_plots(
+                    out1,
+                    out2,
+                    run_out_dir
+                    / "cosine_distributions.png",
+                )
+
+            # Clear memory before the next model.
+            del wrapper
+            del out1
+            del out2
+
+            if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
+            gc.collect()
+
+    # ================================================================
+    # BPCC LANGUAGE-WISE ANALYSIS
+    # ================================================================
+
+    for lang in bpcc_languages:
+        print(
+            f"\n[Data] Evaluating BPCC "
+            f"Language Split: {lang}"
+        )
+
+        try:
+            s1_list, s2_list, gold_scores = (
+                load_bpcc_by_language(
+                    language_split=lang,
+                    max_samples=1000,
+                )
+            )
+        except Exception as e:
+            print(
+                f"     [Warning] Could not load BPCC "
+                f"language {lang}: {e}. Skipping."
+            )
+            continue
+
+        print(
+            f"     Loaded {len(s1_list)} "
+            "sentence pairs."
+        )
+
+        for model_id in models_to_test:
+            print("\n" + "-" * 70)
+            print(
+                f"Evaluating Model: {model_id} "
+                f"on BPCC Language: {lang}"
+            )
+            print("-" * 70)
+
+            config = ModelConfig(
+                model_id=model_id,
+                task_type="raw",
+                batch_size=8,
+            )
+
+            try:
+                wrapper = EmbeddingGemmaWrapper(config)
+            except Exception as e:
+                print(
+                    f"     [Error] Failed to initialize "
+                    f"{model_id}: {e}"
+                )
+                continue
+
+            print(
+                f"     Compute device:   "
+                f"{wrapper.device}"
+            )
+            print(
+                f"     Numerical dtype:  "
+                f"{wrapper.dtype}"
+            )
+
+            # Extract representations.
+            print("     Encoding sentence 1 corpus...")
+            out1 = wrapper.encode(
+                s1_list,
+                return_hidden_states=True,
+                to_cpu=True,
+            )
+
+            print("     Encoding sentence 2 corpus...")
+            out2 = wrapper.encode(
+                s2_list,
+                return_hidden_states=True,
+                to_cpu=True,
+            )
+
+            # Compute metrics.
+            print(
+                "     Computing layer-wise "
+                "geometry metrics..."
+            )
+
+            records = analyze_layer_geometry(
+                out1,
+                out2,
+                gold_scores,
+            )
+
+            # Create a separate directory for every
+            # language/model combination.
+            safe_model_name = model_id.replace(
+                "/",
+                "_",
+            )
+
+            run_out_dir = (
+                output_dir
+                / f"BPCC_{lang}_{safe_model_name}"
+            )
+
+            run_out_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            # Display table summary.
+            table_data = [
+                {
+                    "Layer": r.layer_name,
+                    "Cosine Cone (↓)": (
+                        f"{r.cosine_anisotropy:.4f}"
+                    ),
+                    "Spearman (↑)": (
+                        f"{r.spearman_correlation:.4f}"
+                    ),
+                    "IsoScore (↑)": (
+                        f"{r.isoscore:.4f}"
+                    ),
+                    "ID Score (↑)": (
+                        f"{r.id_score:.4f}"
+                    ),
+                    "Rogue λ₁ Share (↓)": (
+                        f"{r.rogue_ratio:.4f}"
+                    ),
+                }
+                for r in records
+            ]
+
+            print(
+                "\n"
+                + tabulate(
+                    table_data,
+                    headers="keys",
+                    tablefmt="github",
+                )
+            )
+
+            # Save numerical results.
+            save_numerical_results(
+                records,
+                run_out_dir,
+            )
+
+            # Generate plots.
+            generate_trajectory_plots(
+                records,
+                run_out_dir / "cone_analysis.png",
+            )
+
+            # Clear memory before loading the next model.
+            del wrapper
+            del out1
+            del out2
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+            gc.collect()
 
     print("\n" + "=" * 70)
-    print("Multi-model analysis execution completed successfully.")
+    print(
+        "Multi-model and multi-dataset analysis "
+        "execution completed successfully."
+    )
     print("=" * 70)
+
 
 if __name__ == "__main__":
     main()

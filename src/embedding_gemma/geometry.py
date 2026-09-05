@@ -356,13 +356,15 @@ def analyze_layer_geometry(
             dim=-1,
         )
 
-        spearman_rho = (
-            compute_spearman_correlation(
-                pair_similarities,
-                gold_scores,
-            )
+        # Skip Spearman correlation when gold scores are
+        # missing or constant, as correlation is undefined.
+        if gold_scores is not None and len(set(gold_scores)) > 1:
+            spearman_rho = compute_spearman_correlation(
+            pair_similarities,
+            gold_scores,
         )
-
+        else:
+            spearman_rho = float("nan")
         # Layer display name.
         name = (
             f"{layer_idx} (Embed)"

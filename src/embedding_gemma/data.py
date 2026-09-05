@@ -48,3 +48,14 @@ def load_bpcc_gold_standard(split: str = "hin_Deva") -> tuple[Sequence[str], Seq
     gold_scores: np.ndarray = np.ones(len(s1_list), dtype=np.float64)
 
     return s1_list, s2_list, gold_scores
+
+def load_bpcc_by_language(language_split: str = "hin_Deva", max_samples: int = 1000) -> tuple[Sequence[str], Sequence[str], None]:
+    """Load human-verified BPCC sentences for a specific language split without gold scores."""
+    dataset = load_dataset("ai4bharat/BPCC", language_split, split="train")
+    subset = dataset.select(range(min(max_samples, len(dataset))))
+
+    # BPCC rows typically contain source and target sentences
+    s1_list = [str(row.get("source", list(row.values())[0])) for row in subset]
+    s2_list = [str(row.get("target", list(row.values())[1])) for row in subset]
+
+    return s1_list, s2_list, None

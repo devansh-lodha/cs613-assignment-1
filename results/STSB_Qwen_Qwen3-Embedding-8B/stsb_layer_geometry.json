@@ -1,0 +1,335 @@
+[
+  {
+    "layer_index": 0,
+    "layer_name": "0 (Embed)",
+    "cosine_anisotropy": 0.5472617838727408,
+    "isoscore": 0.01313856263314452,
+    "rogue_ratio": 0.09692533314228058,
+    "id_score": 2197.2706999267357,
+    "spearman_correlation": 0.44058101553734563
+  },
+  {
+    "layer_index": 1,
+    "layer_name": "1",
+    "cosine_anisotropy": 0.9102168586505778,
+    "isoscore": 0.007338668139547245,
+    "rogue_ratio": 0.14667388796806335,
+    "id_score": 1977.54346655464,
+    "spearman_correlation": 0.3861194049490129
+  },
+  {
+    "layer_index": 2,
+    "layer_name": "2",
+    "cosine_anisotropy": 0.9394515802288962,
+    "isoscore": 0.0019987361066985832,
+    "rogue_ratio": 0.31485581398010254,
+    "id_score": 1977.5437835096945,
+    "spearman_correlation": 0.3264021992643747
+  },
+  {
+    "layer_index": 3,
+    "layer_name": "3",
+    "cosine_anisotropy": 0.9398486264769348,
+    "isoscore": 0.001350796486545025,
+    "rogue_ratio": 0.3799300193786621,
+    "id_score": 2087.406854731988,
+    "spearman_correlation": 0.3108204617573671
+  },
+  {
+    "layer_index": 4,
+    "layer_name": "4",
+    "cosine_anisotropy": 0.9262144590628749,
+    "isoscore": 0.002200892138092974,
+    "rogue_ratio": 0.29865995049476624,
+    "id_score": 2087.4067796105833,
+    "spearman_correlation": 0.36959318750658743
+  },
+  {
+    "layer_index": 5,
+    "layer_name": "5",
+    "cosine_anisotropy": 0.9312931087507255,
+    "isoscore": 0.003518225522731928,
+    "rogue_ratio": 0.22740139067173004,
+    "id_score": 1867.6803912081616,
+    "spearman_correlation": 0.4104807261044545
+  },
+  {
+    "layer_index": 6,
+    "layer_name": "6",
+    "cosine_anisotropy": 0.9150609063648951,
+    "isoscore": 0.007023031671541016,
+    "rogue_ratio": 0.139639213681221,
+    "id_score": 2087.406774573982,
+    "spearman_correlation": 0.4549674466991667
+  },
+  {
+    "layer_index": 7,
+    "layer_name": "7",
+    "cosine_anisotropy": 0.998815063239933,
+    "isoscore": 1.4954069168374464e-06,
+    "rogue_ratio": 0.996951699256897,
+    "id_score": 1867.6794945300535,
+    "spearman_correlation": 0.15969142136849457
+  },
+  {
+    "layer_index": 8,
+    "layer_name": "8",
+    "cosine_anisotropy": 0.9985852916578223,
+    "isoscore": 1.926382991897847e-06,
+    "rogue_ratio": 0.9960784912109375,
+    "id_score": 1867.6797740184734,
+    "spearman_correlation": 0.16888249929805094
+  },
+  {
+    "layer_index": 9,
+    "layer_name": "9",
+    "cosine_anisotropy": 0.9981553868212182,
+    "isoscore": 3.002087645887416e-06,
+    "rogue_ratio": 0.9939086437225342,
+    "id_score": 1867.6805842156755,
+    "spearman_correlation": 0.22564060127333277
+  },
+  {
+    "layer_index": 10,
+    "layer_name": "10",
+    "cosine_anisotropy": 0.9979816716333936,
+    "isoscore": 3.360633254859044e-06,
+    "rogue_ratio": 0.9931883215904236,
+    "id_score": 1757.8178130368744,
+    "spearman_correlation": 0.23243438844836675
+  },
+  {
+    "layer_index": 11,
+    "layer_name": "11",
+    "cosine_anisotropy": 0.9977489183281827,
+    "isoscore": 3.5991175126440453e-06,
+    "rogue_ratio": 0.9927102327346802,
+    "id_score": 1977.5432437034385,
+    "spearman_correlation": 0.24764333928550594
+  },
+  {
+    "layer_index": 12,
+    "layer_name": "12",
+    "cosine_anisotropy": 0.9973868775093419,
+    "isoscore": 4.069109222585533e-06,
+    "rogue_ratio": 0.991769552230835,
+    "id_score": 1977.5428300603758,
+    "spearman_correlation": 0.2555753418374679
+  },
+  {
+    "layer_index": 13,
+    "layer_name": "13",
+    "cosine_anisotropy": 0.9968317403025243,
+    "isoscore": 4.646940572703656e-06,
+    "rogue_ratio": 0.9906169772148132,
+    "id_score": 1977.5424972874619,
+    "spearman_correlation": 0.2562982325297138
+  },
+  {
+    "layer_index": 14,
+    "layer_name": "14",
+    "cosine_anisotropy": 0.9966865900220008,
+    "isoscore": 4.924576034087305e-06,
+    "rogue_ratio": 0.9900646209716797,
+    "id_score": 1867.679323353369,
+    "spearman_correlation": 0.25426857421607624
+  },
+  {
+    "layer_index": 15,
+    "layer_name": "15",
+    "cosine_anisotropy": 0.996380963404218,
+    "isoscore": 5.3153095174401525e-06,
+    "rogue_ratio": 0.9892886281013489,
+    "id_score": 1867.679185134062,
+    "spearman_correlation": 0.2502481988770923
+  },
+  {
+    "layer_index": 16,
+    "layer_name": "16",
+    "cosine_anisotropy": 0.9959902384091521,
+    "isoscore": 5.915203501061662e-06,
+    "rogue_ratio": 0.9881000518798828,
+    "id_score": 1867.6794713913168,
+    "spearman_correlation": 0.2467224246633924
+  },
+  {
+    "layer_index": 17,
+    "layer_name": "17",
+    "cosine_anisotropy": 0.995933585670246,
+    "isoscore": 5.83573072788398e-06,
+    "rogue_ratio": 0.988257110118866,
+    "id_score": 1647.9639025167837,
+    "spearman_correlation": 0.24995556008135159
+  },
+  {
+    "layer_index": 18,
+    "layer_name": "18",
+    "cosine_anisotropy": 0.9954337892441705,
+    "isoscore": 6.6030651812674305e-06,
+    "rogue_ratio": 0.9867425560951233,
+    "id_score": 1757.815899860847,
+    "spearman_correlation": 0.24929049511032775
+  },
+  {
+    "layer_index": 19,
+    "layer_name": "19",
+    "cosine_anisotropy": 0.9948833631598514,
+    "isoscore": 7.332238881196275e-06,
+    "rogue_ratio": 0.9853094220161438,
+    "id_score": 1757.8160071852808,
+    "spearman_correlation": 0.252609534009481
+  },
+  {
+    "layer_index": 20,
+    "layer_name": "20",
+    "cosine_anisotropy": 0.9939494874848313,
+    "isoscore": 8.753076227052925e-06,
+    "rogue_ratio": 0.9825344085693359,
+    "id_score": 1757.8220141147606,
+    "spearman_correlation": 0.2540833414162045
+  },
+  {
+    "layer_index": 21,
+    "layer_name": "21",
+    "cosine_anisotropy": 0.993424584950251,
+    "isoscore": 9.99602826656974e-06,
+    "rogue_ratio": 0.9801262617111206,
+    "id_score": 1647.9530397439878,
+    "spearman_correlation": 0.26174008636209684
+  },
+  {
+    "layer_index": 22,
+    "layer_name": "22",
+    "cosine_anisotropy": 0.9926985950097852,
+    "isoscore": 1.1685346490195684e-05,
+    "rogue_ratio": 0.976881206035614,
+    "id_score": 1538.091615534603,
+    "spearman_correlation": 0.2738249248037235
+  },
+  {
+    "layer_index": 23,
+    "layer_name": "23",
+    "cosine_anisotropy": 0.9910989602009257,
+    "isoscore": 1.5758615072304145e-05,
+    "rogue_ratio": 0.9691839218139648,
+    "id_score": 1538.09024772665,
+    "spearman_correlation": 0.2926201684451021
+  },
+  {
+    "layer_index": 24,
+    "layer_name": "24",
+    "cosine_anisotropy": 0.9876185737293085,
+    "isoscore": 2.5600462623118388e-05,
+    "rogue_ratio": 0.9513033628463745,
+    "id_score": 1647.9529141333644,
+    "spearman_correlation": 0.3439099851251771
+  },
+  {
+    "layer_index": 25,
+    "layer_name": "25",
+    "cosine_anisotropy": 0.9820538435416438,
+    "isoscore": 4.330656624700219e-05,
+    "rogue_ratio": 0.921449601650238,
+    "id_score": 1757.816305495041,
+    "spearman_correlation": 0.39901040405261023
+  },
+  {
+    "layer_index": 26,
+    "layer_name": "26",
+    "cosine_anisotropy": 0.9786141874075771,
+    "isoscore": 5.826794188323772e-05,
+    "rogue_ratio": 0.8982803225517273,
+    "id_score": 1647.9531999184364,
+    "spearman_correlation": 0.42651805707590273
+  },
+  {
+    "layer_index": 27,
+    "layer_name": "27",
+    "cosine_anisotropy": 0.9736991746834721,
+    "isoscore": 8.227933102267204e-05,
+    "rogue_ratio": 0.8644891977310181,
+    "id_score": 1647.9534904755558,
+    "spearman_correlation": 0.48643324909091396
+  },
+  {
+    "layer_index": 28,
+    "layer_name": "28",
+    "cosine_anisotropy": 0.9683013613549634,
+    "isoscore": 0.00011326125569561202,
+    "rogue_ratio": 0.8259296417236328,
+    "id_score": 1647.953382182856,
+    "spearman_correlation": 0.5165969469172854
+  },
+  {
+    "layer_index": 29,
+    "layer_name": "29",
+    "cosine_anisotropy": 0.9641644590911178,
+    "isoscore": 0.00014849585391445315,
+    "rogue_ratio": 0.7876250147819519,
+    "id_score": 1867.6796348709831,
+    "spearman_correlation": 0.5347883372257036
+  },
+  {
+    "layer_index": 30,
+    "layer_name": "30",
+    "cosine_anisotropy": 0.9564376218489494,
+    "isoscore": 0.00022352975098748195,
+    "rogue_ratio": 0.7210798859596252,
+    "id_score": 1867.6795501884303,
+    "spearman_correlation": 0.610025543297807
+  },
+  {
+    "layer_index": 31,
+    "layer_name": "31",
+    "cosine_anisotropy": 0.9515406783668323,
+    "isoscore": 0.00031301024317401897,
+    "rogue_ratio": 0.6596916913986206,
+    "id_score": 1977.5426540371063,
+    "spearman_correlation": 0.6334812524401087
+  },
+  {
+    "layer_index": 32,
+    "layer_name": "32",
+    "cosine_anisotropy": 0.9479793082958105,
+    "isoscore": 0.000417074353438434,
+    "rogue_ratio": 0.6044981479644775,
+    "id_score": 1977.5427442375192,
+    "spearman_correlation": 0.6539505042518896
+  },
+  {
+    "layer_index": 33,
+    "layer_name": "33",
+    "cosine_anisotropy": 0.9463484846633217,
+    "isoscore": 0.0005097323230171489,
+    "rogue_ratio": 0.564990222454071,
+    "id_score": 1867.6798878580155,
+    "spearman_correlation": 0.6593750290846383
+  },
+  {
+    "layer_index": 34,
+    "layer_name": "34",
+    "cosine_anisotropy": 0.9487247390708904,
+    "isoscore": 0.0006246917037367502,
+    "rogue_ratio": 0.5251825451850891,
+    "id_score": 1977.542996338281,
+    "spearman_correlation": 0.668945750283024
+  },
+  {
+    "layer_index": 35,
+    "layer_name": "35",
+    "cosine_anisotropy": 0.9534864315931769,
+    "isoscore": 0.0029324747127645306,
+    "rogue_ratio": 0.2506754696369171,
+    "id_score": 2197.269055371791,
+    "spearman_correlation": 0.7064717900629763
+  },
+  {
+    "layer_index": 36,
+    "layer_name": "36",
+    "cosine_anisotropy": 0.7567905074897678,
+    "isoscore": 0.0021227592596748733,
+    "rogue_ratio": 0.310880184173584,
+    "id_score": 1867.6791704646641,
+    "spearman_correlation": 0.5908490753885075
+  }
+]
