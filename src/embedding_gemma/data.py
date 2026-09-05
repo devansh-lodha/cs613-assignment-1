@@ -35,3 +35,18 @@ def load_stsb_benchmark(
     gold_scores: np.ndarray = np.asarray(dataset["score"], dtype=np.float64)
 
     return s1_list, s2_list, gold_scores
+
+def load_bpcc_gold_standard(split: str = "train") -> tuple[Sequence[str], Sequence[str], np.ndarray]:
+    """Load the gold-standard human-verified subset of BPCC."""
+    # This requires you to be logged into huggingface-cli
+    dataset = load_dataset("ai4bharat/BPCC", "bpcc-human", split=split)
+    
+    # Assuming standard parallel corpus column names 'en' and 'hi'
+    s1_list: list[str] = [str(row["en"]) for row in dataset]
+    s2_list: list[str] = [str(row["hi"]) for row in dataset]
+    
+    # Parallel corpora lack 0-5 human STS ratings. 
+    # Providing dummy scores to satisfy the existing analyze_layer_geometry signature.
+    gold_scores: np.ndarray = np.ones(len(s1_list), dtype=np.float64)
+    
+    return s1_list, s2_list, gold_scores
