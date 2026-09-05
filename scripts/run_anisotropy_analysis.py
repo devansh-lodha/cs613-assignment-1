@@ -3,7 +3,7 @@
 import csv
 import json
 from pathlib import Path
-
+import gc
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -333,7 +333,11 @@ def main() -> None:
     print("=" * 70)
 
     # Define the 2x2 experimental matrix requested by your teammate
-    models_to_test = ["google/embeddinggemma-300m", "bert-base-multilingual-cased"]
+    models_to_test = [
+    "Qwen/Qwen3-Embedding-8B",
+    "google/embeddinggemma-300m",
+    "bert-base-multilingual-cased"
+    ]
     datasets_to_test = {
         "STS-B": load_stsb_benchmark,
         "BPCC-Human": load_bpcc_gold_standard,
@@ -358,7 +362,7 @@ def main() -> None:
             print(f"----------------------------------------------------------------------")
 
             # Initialize config (ModelConfig is frozen, pass model_id on init)
-            config = ModelConfig(model_id=model_id, task_type="raw", batch_size=64)
+            config = ModelConfig(model_id=model_id, task_type="raw", batch_size=8)
 
             try:
                 wrapper = EmbeddingGemmaWrapper(config)
@@ -389,9 +393,10 @@ def main() -> None:
                 {
                     "Layer": r.layer_name,
                     "Cosine Cone (↓)": f"{r.cosine_anisotropy:.4f}",
-                    "IsoScore (↑)": f"{r.isoscore:.4f}",
-                    "Rogue λ₁ Share (↓)": f"{r.rogue_ratio:.4f}",
                     "STS-B Spearman (↑)": f"{r.spearman_correlation:.4f}",
+                    "IsoScore (↑)": f"{r.isoscore:.4f}",
+                    "ID Score (↑)": f"{r.id_score:.4f}",
+                    "Rogue λ₁ Share (↓)": f"{r.rogue_ratio:.4f}",
                 }
                 for r in records
             ]
@@ -409,6 +414,12 @@ def main() -> None:
                 generate_cosine_distribution_plots(out1, out2, run_out_dir / "cosine_distributions.png")
             else:
                 print("     [Notice] Skipping 24-layer specific trajectory plots for non-Gemma control model.")
+
+                # Clear VRAM before loading the next model
+                del wrapper
+                del out1
+                del out2
+                torch.cuda.empty_cache()
 
 
     print("\n" + "=" * 70)

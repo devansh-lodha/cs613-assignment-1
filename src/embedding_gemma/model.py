@@ -7,7 +7,7 @@ from typing import Any
 
 import torch
 import torch.nn.functional as F
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, BitsAndBytesConfig
 
 from embedding_gemma.config import ModelConfig
 from embedding_gemma.device import get_optimal_device, get_optimal_dtype
@@ -29,6 +29,7 @@ class EmbeddingOutput:
 
     embeddings: torch.Tensor
     layer_hidden_states: list[torch.Tensor] | None = None
+
 
 
 class EmbeddingGemmaWrapper:
@@ -79,18 +80,25 @@ class EmbeddingGemmaWrapper:
             if isinstance(pad_str, str):
                 self.tokenizer.pad_token = pad_str
 
-        # Load transformer weights directly in target precision and transfer to device.
-        model = AutoModel.from_pretrained(
+
+        # Load the model using 4-bit quantization to reduce VRAM usage.
+        quant_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.bfloat16,
+        )
+
+        self.model = AutoModel.from_pretrained(
             config.model_id,
-            dtype=self.dtype,
+            quantization_config=quant_config,
+            device_map="auto",
             attn_implementation=config.attn_implementation,
             token=token,
         )
-        if model is None:
+
+        if self.model is None:
             msg = f"Failed to load model for model ID: {config.model_id}"
             raise RuntimeError(msg)
 
-        self.model = model.to(self.device)
         self.model.eval()
 
         # Synchronize pad token identifier between tokenizer and model configuration.
