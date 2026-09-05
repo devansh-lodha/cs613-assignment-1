@@ -11,13 +11,14 @@ import torch.nn.functional as F
 from tabulate import tabulate
 
 from embedding_gemma.config import ModelConfig
-from embedding_gemma.data import load_stsb_benchmark
+from embedding_gemma.data import load_stsb_benchmark, load_bpcc_gold_standard
 from embedding_gemma.geometry import (
     LayerGeometryRecord,
     analyze_layer_geometry,
 )
 from embedding_gemma.model import EmbeddingGemmaWrapper, EmbeddingOutput
 from embedding_gemma.utils import set_seed
+
 
 
 def save_numerical_results(
@@ -170,36 +171,27 @@ def generate_3d_geometry_plots(
     output_s1: EmbeddingOutput,
     output_s2: EmbeddingOutput,
     output_path: Path,
-    selected_layers: tuple[int, ...] = (0, 4, 10, 16, 23, 24),
+    selected_layers: tuple[int, ...] = None,
 ) -> None:
-    """Generate 6-panel 3D PCA point cloud showing representation collapse across depth.
-
-    Args:
-        output_s1: EmbeddingOutput for sentence 1 corpus.
-        output_s2: EmbeddingOutput for sentence 2 corpus.
-        output_path: Destination image filepath.
-        selected_layers: Tuple of layer indices to display.
-
-    """
     if output_s1.layer_hidden_states is None or output_s2.layer_hidden_states is None:
         return
 
+    num_layers = len(output_s1.layer_hidden_states)
+
+    # Dynamically pick layers if not specified or out of bounds
+    if selected_layers is None or max(selected_layers) >= num_layers:
+        # Pick 6 evenly spaced layers across whatever model depth we have
+        selected_layers = tuple(np.linspace(0, num_layer - 1, 6, dtype=int)) if (num_layer := num_layers) else (0, 1, 2, 3, 4, 5)
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    layer_titles = [
-        "Layer 0 (Embeddings)",
-        "Layer 4 (Early Cone)",
-        "Layer 10 (Mid Depth)",
-        "Layer 16 (Late Depth)",
-        "Layer 23 (Peak Cone)",
-        "Layer 24 (Contrastive Repair)",
-    ]
 
     fig = plt.figure(figsize=(18, 10), dpi=300)
 
-    for idx, (l_idx, title) in enumerate(
-        zip(selected_layers, layer_titles, strict=False),
-    ):
+    for idx, l_idx in enumerate(selected_layers):
+        if l_idx >= num_layers:
+            continue
         ax = fig.add_subplot(2, 3, idx + 1, projection="3d")
+        title = f"Layer {l_idx} (Total: {num_layers})"
 
         h = torch.cat(
             [
@@ -215,17 +207,10 @@ def generate_3d_geometry_plots(
         _u, _s, v = torch.pca_lowrank(centered, q=3)
         proj = torch.mm(centered, v[:, :3]).numpy()
 
-        color = "#d62728" if l_idx == 23 else ("#2ca02c" if l_idx == 24 else "#1f77b4")
         ax.scatter(
-            proj[:, 0],
-            proj[:, 1],
-            proj[:, 2],
-            alpha=0.35,
-            s=12,
-            c=color,
-            edgecolors="none",
+            proj[:, 0], proj[:, 1], proj[:, 2],
+            alpha=0.35, s=12, c="#1f77b4", edgecolors="none",
         )
-
         ax.set_title(title, fontsize=12, fontweight="bold", pad=8)
         ax.set_xlim([-0.4, 0.4])
         ax.set_ylim([-0.4, 0.4])
@@ -337,75 +322,98 @@ def generate_cosine_distribution_plots(
 
 
 def main() -> None:
-    """Execute complete layer-wise representation geometry pipeline on STS-B."""
+    """Execute complete layer-wise representation geometry pipeline across multiple models and datasets."""
     set_seed(42)
 
     output_dir = Path("results")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 70)
-    print("EmbeddingGemma Layer-Wise Geometric Representation Analysis")
+    print("Multi-Model & Multi-Dataset Layer-Wise Representation Analysis")
     print("=" * 70)
 
-    # Step 1: Load STS-B benchmark test split
-    print("\n[1/4] Loading STS-B benchmark test split...")
-    s1_list, s2_list, gold_scores = load_stsb_benchmark(split="test")
-    print(f"      Loaded {len(s1_list)} sentence pairs with gold human ratings.")
+    # Define the 2x2 experimental matrix requested by your teammate
+    models_to_test = ["google/embeddinggemma-300m", "bert-base-multilingual-cased"]
+    datasets_to_test = {
+        "STS-B": load_stsb_benchmark,
+        "BPCC-Human": load_bpcc_gold_standard,
+    }
 
-    # Step 2: Initialize model wrapper
-    print("\n[2/4] Initializing EmbeddingGemma model wrapper...")
-    config = ModelConfig(task_type="raw", batch_size=64)
-    wrapper = EmbeddingGemmaWrapper(config)
-    print(f"      Compute device:   {wrapper.device}")
-    print(f"      Numerical dtype:  {wrapper.dtype}")
-    print(f"      Model identifier: {config.model_id}")
+    for data_name, data_loader in datasets_to_test.items():
+        print(f"\n[Data] Loading {data_name} dataset...")
+        try:
+            s1_list, s2_list, gold_scores = data_loader()
+        except Exception as e:
+            print(f"     [Warning] Could not load {data_name}: {e}. Skipping.")
+            continue
 
-    # Step 3: Extract representations across all layers
-    print("\n[3/4] Extracting hidden representations across all 25 layers...")
-    print("      Encoding sentence 1 corpus...")
-    out1 = wrapper.encode(s1_list, return_hidden_states=True, to_cpu=True)
-    print("      Encoding sentence 2 corpus...")
-    out2 = wrapper.encode(s2_list, return_hidden_states=True, to_cpu=True)
+        print(f"     Loaded {len(s1_list)} sentence pairs.")
 
-    # Step 4: Compute geometric and semantic metrics
-    print("\n[4/4] Computing layer-wise geometry metrics...")
-    records = analyze_layer_geometry(out1, out2, gold_scores)
+        # Optional: Slice dataset to 1000 pairs during initial testing to save time/compute
+        s1_list, s2_list, gold_scores = s1_list[:1000], s2_list[:1000], gold_scores[:1000]
 
-    # Display results table
-    table_data = [
-        {
-            "Layer": r.layer_name,
-            "Cosine Cone (↓)": f"{r.cosine_anisotropy:.4f}",
-            "IsoScore (↑)": f"{r.isoscore:.4f}",
-            "Rogue λ₁ Share (↓)": f"{r.rogue_ratio:.4f}",
-            "STS-B Spearman (↑)": f"{r.spearman_correlation:.4f}",
-        }
-        for r in records
-    ]
-    print("\n" + tabulate(table_data, headers="keys", tablefmt="github"))
+        for model_id in models_to_test:
+            print(f"\n----------------------------------------------------------------------")
+            print(f"Evaluating Model: {model_id} on Dataset: {data_name}")
+            print(f"----------------------------------------------------------------------")
 
-    # Save quantitative data artifacts
-    json_path, csv_path = save_numerical_results(records, output_dir)
-    print(f"\nSaved quantitative JSON artifact to: {json_path}")
-    print(f"Saved quantitative CSV artifact to:  {csv_path}")
+            # Initialize config (ModelConfig is frozen, pass model_id on init)
+            config = ModelConfig(model_id=model_id, task_type="raw", batch_size=64)
 
-    # Generate and save visualization figures
-    plot_path = output_dir / "embedding_gemma_cone_analysis.png"
-    generate_trajectory_plots(records, plot_path)
-    print(f"Saved trajectory curves visualization to:  {plot_path}")
+            try:
+                wrapper = EmbeddingGemmaWrapper(config)
+            except Exception as e:
+                print(f"     [Error] Failed to initialize {model_id}: {e}")
+                continue
 
-    plot_3d_path = output_dir / "embedding_gemma_cone_3d_progression.png"
-    generate_3d_geometry_plots(out1, out2, plot_3d_path)
-    print(f"Saved 3D progression visualization to:      {plot_3d_path}")
+            print(f"     Compute device:   {wrapper.device}")
+            print(f"     Numerical dtype:  {wrapper.dtype}")
 
-    plot_dist_path = output_dir / "embedding_gemma_cosine_distributions.png"
-    generate_cosine_distribution_plots(out1, out2, plot_dist_path)
-    print(f"Saved cosine distribution visualization to: {plot_dist_path}")
+            # Extract representations
+            print("     Encoding sentence 1 corpus...")
+            out1 = wrapper.encode(s1_list, return_hidden_states=True, to_cpu=True)
+            print("     Encoding sentence 2 corpus...")
+            out2 = wrapper.encode(s2_list, return_hidden_states=True, to_cpu=True)
+
+            # Compute metrics
+            print("     Computing layer-wise geometry metrics...")
+            records = analyze_layer_geometry(out1, out2, gold_scores)
+
+            # Create distinct subdirectories for results to prevent file overwrites
+            safe_model_name = model_id.replace("/", "_")
+            run_out_dir = output_dir / f"{data_name}_{safe_model_name}"
+            run_out_dir.mkdir(parents=True, exist_ok=True)
+
+            # Display table summary
+            table_data = [
+                {
+                    "Layer": r.layer_name,
+                    "Cosine Cone (↓)": f"{r.cosine_anisotropy:.4f}",
+                    "IsoScore (↑)": f"{r.isoscore:.4f}",
+                    "Rogue λ₁ Share (↓)": f"{r.rogue_ratio:.4f}",
+                    "STS-B Spearman (↑)": f"{r.spearman_correlation:.4f}",
+                }
+                for r in records
+            ]
+            print("\n" + tabulate(table_data, headers="keys", tablefmt="github"))
+
+            # Save quantitative and qualitative outputs
+            json_path, csv_path = save_numerical_results(records, run_out_dir)
+            print(f"\nSaved artifacts to: {run_out_dir}")
+
+            # Only generate these specific multi-layer progression plots for Gemma
+            # (since BERT has 12 layers instead of 24, avoiding index out of range)
+            if "embeddinggemma" in model_id.lower():
+                generate_trajectory_plots(records, run_out_dir / "cone_analysis.png")
+                generate_3d_geometry_plots(out1, out2, run_out_dir / "cone_3d_progression.png")
+                generate_cosine_distribution_plots(out1, out2, run_out_dir / "cosine_distributions.png")
+            else:
+                print("     [Notice] Skipping 24-layer specific trajectory plots for non-Gemma control model.")
+
 
     print("\n" + "=" * 70)
-    print("Analysis execution completed successfully.")
+    print("Multi-model analysis execution completed successfully.")
     print("=" * 70)
-
 
 if __name__ == "__main__":
     main()

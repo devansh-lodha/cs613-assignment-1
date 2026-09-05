@@ -36,17 +36,15 @@ def load_stsb_benchmark(
 
     return s1_list, s2_list, gold_scores
 
-def load_bpcc_gold_standard(split: str = "train") -> tuple[Sequence[str], Sequence[str], np.ndarray]:
-    """Load the gold-standard human-verified subset of BPCC."""
-    # This requires you to be logged into huggingface-cli
-    dataset = load_dataset("ai4bharat/BPCC", "bpcc-human", split=split)
-    
-    # Assuming standard parallel corpus column names 'en' and 'hi'
-    s1_list: list[str] = [str(row["en"]) for row in dataset]
-    s2_list: list[str] = [str(row["hi"]) for row in dataset]
-    
-    # Parallel corpora lack 0-5 human STS ratings. 
-    # Providing dummy scores to satisfy the existing analyze_layer_geometry signature.
+def load_bpcc_gold_standard(split: str = "hin_Deva") -> tuple[Sequence[str], Sequence[str], np.ndarray]:
+    """Load the gold-standard human-verified subset of BPCC for a specific language split."""
+    # Pass a valid language split like 'hin_Deva' instead of 'train'
+    dataset = load_dataset("ai4bharat/BPCC", "daily", split=split)
+
+    # Check your columns or extract source/target texts correctly depending on the dataset structure
+    s1_list: list[str] = [str(row.get("en", row.get("source", list(row.values())[0]))) for row in dataset]
+    s2_list: list[str] = [str(row.get("hi", row.get("target", list(row.values())[1]))) for row in dataset]
+
     gold_scores: np.ndarray = np.ones(len(s1_list), dtype=np.float64)
-    
+
     return s1_list, s2_list, gold_scores
