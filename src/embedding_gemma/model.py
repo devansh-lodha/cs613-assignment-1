@@ -221,8 +221,11 @@ class EmbeddingGemmaWrapper:
         layer_outputs: list[torch.Tensor] = []
         for layer_tensor in hidden_states:
             layer_pooled = self._mean_pool(layer_tensor, attention_mask)
-            layer_normalized = self._normalize_if_enabled(layer_pooled)
-            layer_outputs.append(layer_normalized)
+            # Only normalize if our new toggle is set to True
+            if self.config.normalize_layers:
+                layer_pooled = self._normalize_if_enabled(layer_pooled)
+
+            layer_outputs.append(layer_pooled)
         return layer_outputs
 
     def _process_batch(

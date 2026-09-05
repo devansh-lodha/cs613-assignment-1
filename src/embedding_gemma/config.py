@@ -35,6 +35,7 @@ class ModelConfig:
     max_length: int = 2048
     batch_size: int = 32
     normalize_embeddings: bool = True
+    normalize_layers: bool = False
     task_type: TaskType = "raw"
     query_template: str = "task: {description} | query: {text}"
     document_template: str = "title: {title} | text: {text}"
