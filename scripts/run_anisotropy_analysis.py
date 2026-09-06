@@ -171,7 +171,7 @@ def plot_pca_compression(
     lang: str,
     output_path: Path,
 ) -> None:
-    """Plot 2D PCA projections of the token cloud at layers across model depth.
+    """Plot 3D PCA projections of the token cloud at layers across model depth.
 
     Visualizes how the representation cloud compresses (collapses toward a narrow
     region) as depth increases, complementing the numeric isotropy metrics.
@@ -180,28 +180,30 @@ def plot_pca_compression(
     num_layers = len(layer_clouds)
     selected = np.linspace(0, num_layers - 1, 6, dtype=int)
 
-    _fig, axes = plt.subplots(2, 3, figsize=(15, 9), dpi=200)
-    flat_axes = axes.flatten()
+    fig = plt.figure(figsize=(15, 9), dpi=200)
 
     for panel, layer_idx in enumerate(selected):
-        ax = flat_axes[panel]
+        ax = fig.add_subplot(2, 3, panel + 1, projection="3d")
         cloud = layer_clouds[layer_idx].astype(np.float32)
 
-        pca = PCA(n_components=2, svd_solver="randomized", random_state=SEED)
+        pca = PCA(n_components=3, svd_solver="randomized", random_state=SEED)
         proj = pca.fit_transform(cloud - cloud.mean(axis=0))
-        var_share = float(pca.explained_variance_ratio_[:2].sum())
+        var_share = float(pca.explained_variance_ratio_[:3].sum())
 
         ax.scatter(
-            proj[:, 0], proj[:, 1], s=6, alpha=0.3, c="#1f77b4", edgecolors="none"
+            proj[:, 0], proj[:, 1], proj[:, 2],
+            s=5, alpha=0.25, c="#1f77b4", edgecolors="none",
         )
         ax.set_title(f"Layer {layer_idx}", fontsize=11, fontweight="bold")
-        ax.set_xlabel("PC 1", fontsize=9)
-        ax.set_ylabel("PC 2", fontsize=9)
-        ax.grid(visible=True, linestyle="--", alpha=0.4)
-        ax.text(
+        ax.set_xlabel("PC 1", fontsize=8, labelpad=1)
+        ax.set_ylabel("PC 2", fontsize=8, labelpad=1)
+        ax.set_zlabel("PC 3", fontsize=8, labelpad=1)
+        ax.tick_params(labelsize=6)
+        ax.view_init(elev=20, azim=-60)
+        ax.text2D(
             0.03,
             0.95,
-            f"Top-2 var: {var_share:.1%}",
+            f"Top-3 var: {var_share:.1%}",
             transform=ax.transAxes,
             fontsize=9,
             va="top",

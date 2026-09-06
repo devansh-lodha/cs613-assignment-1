@@ -86,12 +86,12 @@ ends of the network.
 
 ![Gemma English PCA compression](results/BPCC_hin_Deva_google_embeddinggemma-300m_en/pca_compression.png)
 
-For each model and language we project the token cloud onto its top two principal
-components at six depths (one such figure per combination is saved alongside its
-metrics). The input layer shows a broad, rounded spread. The middle layers
-collapse toward a line or a tight blob, which matches the high SVD Ratio there,
-and the final layer spreads out again. The picture is the same story the metrics
-tell, seen directly.
+For each model and language we project the token cloud onto its top three
+principal components at six depths (one such figure per combination is saved
+alongside its metrics). The input layer shows a broad, rounded spread. The middle
+layers collapse toward a line or a tight blob, which matches the high SVD Ratio
+there, and the final layer spreads out again. The picture is the same story the
+metrics tell, seen directly.
 
 ## Takeaways
 
