@@ -493,6 +493,50 @@ class EmbeddingGemmaWrapper:
             return []
         return [buf[:filled] for buf in buffers]
 
+    def collect_layer_sentence_embeddings(
+        self,
+        texts: Sequence[str],
+    ) -> list[np.ndarray]:
+        """Collect attention-masked mean-pooled sentence embeddings for every layer.
+
+        Runs the model over ``texts`` and, at each layer, applies attention-masked
+        mean pooling across valid (non-padding) tokens to produce a single pooled
+        representation per input sentence.
+
+        Args:
+            texts: Input sentences to encode.
+
+        Returns:
+            List indexed by layer (0 = input embeddings), each a float32 array of
+            shape ``(len(texts), hidden_dim)`` containing the pooled sentence
+            embeddings at that layer.
+
+        """
+        layer_batches: list[list[np.ndarray]] | None = None
+
+        with torch.inference_mode():
+            for i in range(0, len(texts), self.config.batch_size):
+                batch = texts[i : i + self.config.batch_size]
+                inputs = self._tokenize_batch(batch)
+                output = self.model(**inputs, output_hidden_states=True)
+
+                hidden_states = output.hidden_states
+                if hidden_states is None:
+                    continue
+
+                if layer_batches is None:
+                    layer_batches = [[] for _ in hidden_states]
+
+                for layer_idx, layer_tensor in enumerate(hidden_states):
+                    pooled = self._mean_pool(layer_tensor, inputs["attention_mask"])
+                    layer_batches[layer_idx].append(
+                        pooled.to(torch.float32).cpu().numpy(),
+                    )
+
+        if layer_batches is None:
+            return []
+        return [np.concatenate(batches, axis=0) for batches in layer_batches]
+
     def stream_encode(
         self,
         texts: Sequence[str],

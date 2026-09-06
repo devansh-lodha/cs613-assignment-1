@@ -14,7 +14,7 @@ from embedding_gemma.geometry import (
     compute_avg_cosine_similarity,
     compute_id_score,
     compute_isoscore,
-    compute_svd_ratio,
+    compute_mev,
 )
 from embedding_gemma.model import EmbeddingGemmaWrapper, EmbeddingOutput
 from embedding_gemma.utils import set_seed
@@ -29,7 +29,7 @@ __all__ = [
     "compute_avg_cosine_similarity",
     "compute_id_score",
     "compute_isoscore",
-    "compute_svd_ratio",
+    "compute_mev",
     "get_optimal_device",
     "get_optimal_dtype",
     "load_bpcc_parallel",

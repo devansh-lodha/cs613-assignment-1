@@ -26,7 +26,7 @@ class LayerIsotropyRecord:
     isoscore: float
     avg_cosine_similarity: float
     id_score: float
-    svd_ratio: float
+    mev: float
 
     def to_dict(self) -> dict[str, float | int | str]:
         """Convert the record to a JSON/CSV-serializable dictionary."""
@@ -84,8 +84,8 @@ def _isoscore_from_eigenvalues(eigenvalues: np.ndarray, d_dims: int) -> float:
     return float(np.clip(score, 0.0, 1.0))
 
 
-def _svd_ratio_from_eigenvalues(eigenvalues: np.ndarray) -> float:
-    """Compute the top eigenvalue variance share from covariance eigenvalues."""
+def _mev_from_eigenvalues(eigenvalues: np.ndarray) -> float:
+    """Compute the maximum explained variance ratio (MEV) from eigenvalues."""
     total_variance = float(np.sum(eigenvalues))
     if total_variance <= EPSILON:
         return 0.0
@@ -138,17 +138,18 @@ def compute_avg_cosine_similarity(
     return float(1.0 - abs(float(np.mean(cosines))))
 
 
-def compute_svd_ratio(embeddings: np.ndarray | torch.Tensor) -> float:
-    """Compute the SVD Ratio: top eigenvalue share ``lambda_1 / sum(lambda)``.
+def compute_mev(embeddings: np.ndarray | torch.Tensor) -> float:
+    """Compute Maximum Explained Variance (MEV): top eigenvalue share.
 
-    Isolates the fraction of variance captured by the single dominant "rogue"
-    direction. A high value signals that one dimension absorbs a disproportionate
+    Calculates ``lambda_1 / sum(lambda)``, isolating the fraction of variance
+    captured by the single dominant "rogue" direction (formerly referred to as SVD
+    ratio). A high value signals that one dimension absorbs a disproportionate
     share of the representational capacity.
     """
     x = _to_numpy(embeddings)
     if x.shape[0] <= 1:
         return 0.0
-    return _svd_ratio_from_eigenvalues(_covariance_eigenvalues(x))
+    return _mev_from_eigenvalues(_covariance_eigenvalues(x))
 
 
 def compute_id_score(
@@ -209,11 +210,11 @@ def compute_id_score(
 def analyze_point_cloud(embeddings: np.ndarray | torch.Tensor) -> tuple[float, ...]:
     """Compute all four isotropy metrics for a single point cloud.
 
-    The covariance eigendecomposition is shared between IsoScore and the SVD
-    Ratio to avoid decomposing the ``d x d`` covariance matrix twice.
+    The covariance eigendecomposition is shared between IsoScore and MEV
+    to avoid decomposing the ``d x d`` covariance matrix twice.
 
     Returns:
-        Tuple ``(isoscore, avg_cosine_similarity, id_score, svd_ratio)``.
+        Tuple ``(isoscore, avg_cosine_similarity, id_score, mev)``.
 
     """
     x = _to_numpy(embeddings)
@@ -223,11 +224,11 @@ def analyze_point_cloud(embeddings: np.ndarray | torch.Tensor) -> tuple[float, .
 
     eigenvalues = _covariance_eigenvalues(x)
     isoscore = _isoscore_from_eigenvalues(eigenvalues, d_dims)
-    svd_ratio = _svd_ratio_from_eigenvalues(eigenvalues)
+    mev = _mev_from_eigenvalues(eigenvalues)
     avg_cos = compute_avg_cosine_similarity(x)
     id_score = compute_id_score(x)
 
-    return (isoscore, avg_cos, id_score, svd_ratio)
+    return (isoscore, avg_cos, id_score, mev)
 
 
 def analyze_layer_clouds(
@@ -245,7 +246,7 @@ def analyze_layer_clouds(
     """
     records: list[LayerIsotropyRecord] = []
     for layer_idx, cloud in enumerate(layer_clouds):
-        isoscore, avg_cos, id_score, svd_ratio = analyze_point_cloud(cloud)
+        isoscore, avg_cos, id_score, mev = analyze_point_cloud(cloud)
         name = f"{layer_idx} (Embed)" if layer_idx == 0 else str(layer_idx)
         records.append(
             LayerIsotropyRecord(
@@ -254,7 +255,7 @@ def analyze_layer_clouds(
                 isoscore=isoscore,
                 avg_cosine_similarity=avg_cos,
                 id_score=id_score,
-                svd_ratio=svd_ratio,
+                mev=mev,
             ),
         )
     return records

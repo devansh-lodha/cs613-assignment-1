@@ -1,13 +1,13 @@
-"""Layer-wise isotropy analysis of multilingual embeddings on BPCC (en vs hi).
+"""Layer-wise isotropy analysis of multilingual sentence embeddings on BPCC (en vs hi).
 
 For each model (EmbeddingGemma, Qwen3-Embedding) and each language (English,
 Hindi) drawn from a random parallel subset of BPCC, this script:
 
-1. Collects a token-level point cloud after every transformer layer.
-2. Computes IsoScore, Average Random Cosine Similarity, ID Score, SVD Ratio.
-3. Saves the per-layer point clouds (embeddings) and metrics.
+1. Collects pooled sentence embeddings after every transformer layer.
+2. Computes IsoScore, Average Random Cosine Similarity, ID Score, MEV.
+3. Saves the per-layer sentence embeddings and metrics.
 4. Renders four metric-vs-depth comparison plots (Gemma vs Qwen, en vs hi) and a
-   PCA-compression plot per (model, language).
+   3D PCA-compression plot per (model, language).
 """
 
 import csv
@@ -45,7 +45,7 @@ MODELS: dict[str, str] = {
 }
 
 # Both models are small enough for a comfortable batch size on a laptop GPU.
-BATCH_SIZES: dict[str, int] = {"Gemma": 16, "Qwen": 16}
+BATCH_SIZES: dict[str, int] = {"Gemma": 32, "Qwen": 32}
 
 # The four isotropy metrics: (record attribute, human label, higher-is-*).
 METRICS: list[tuple[str, str, str]] = [
@@ -56,7 +56,7 @@ METRICS: list[tuple[str, str, str]] = [
         "higher = more isotropic",
     ),
     ("id_score", "ID Score (normalized)", "higher = higher intrinsic dim"),
-    ("svd_ratio", "SVD Ratio", "lower = less rogue dominance"),
+    ("mev", "MEV", "lower = less rogue dominance"),
 ]
 
 # Distinct style per (model, language) series for the comparison plots.
@@ -116,7 +116,7 @@ def print_metric_table(records: list[LayerIsotropyRecord]) -> None:
             "IsoScore": f"{r.isoscore:.4f}",
             "AvgCos": f"{r.avg_cosine_similarity:.4f}",
             "ID Score": f"{r.id_score:.4f}",
-            "SVD Ratio": f"{r.svd_ratio:.4f}",
+            "MEV": f"{r.mev:.4f}",
         }
         for r in records
     ]
@@ -229,7 +229,7 @@ def plot_pca_compression(
 
     plt.suptitle(
         f"{model_label} ({LANGUAGE_LABELS.get(lang, lang)}): "
-        "PCA Compression of Token Cloud across Depth",
+        "3D PCA Compression of Sentence Embeddings across Depth",
         fontsize=14,
         fontweight="bold",
         y=0.99,
@@ -286,16 +286,12 @@ def main() -> None:
         for lang, texts in texts_by_lang.items():
             print(
                 f"\n  >> {model_label} / {LANGUAGE_LABELS[lang]}: "
-                "collecting token clouds ..."
+                "collecting sentence embeddings ..."
             )
-            layer_clouds = wrapper.collect_layer_token_clouds(
-                texts,
-                max_tokens=TOKEN_CAP,
-                seed=SEED,
-            )
+            layer_clouds = wrapper.collect_layer_sentence_embeddings(texts)
             print(
                 f"     Layers: {len(layer_clouds)} | "
-                f"tokens/layer: {layer_clouds[0].shape[0]} | "
+                f"sentences/layer: {layer_clouds[0].shape[0]} | "
                 f"dim: {layer_clouds[0].shape[1]}"
             )
 
