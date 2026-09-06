@@ -1,4 +1,4 @@
-# Layer-wise Isotropy of Multilingual Embeddings on BPCC (English vs Hindi)
+# Layer-wise Isotropy of Multilingual Sentence Embeddings on BPCC (English vs Hindi)
 
 We measure how two embedding models organize their representation space at each
 layer, and whether they treat English and Hindi differently. Every measurement
@@ -20,19 +20,18 @@ difference in what is being said.
 
 We compare EmbeddingGemma-300m (24 layers plus the input embedding, hidden size
 768) and Qwen3-Embedding-0.6B (28 layers plus the input embedding, hidden size
-1024). Both models run in full native `bfloat16` precision with default model
-architectures.
+1024). Both models run in full native `bfloat16` precision without quantization,
+adhering strictly to default architectures and native pooling specifications:
 
-To evaluate representation isotropy after each transformer layer, we formalize
-the token representations as a point cloud. Given an input token sequence of
-length $n$, the tokenizer and subsequent embedding layer produce a representation
-matrix $X \in \mathbb{R}^{n \times d}$, where $d$ is the embedding dimension.
-After processing this sequence through a transformer layer, we obtain an updated
-$n \times d$ representation matrix $X$. By treating the $n$ row vectors of this
-matrix as a point cloud $X \subseteq \mathbb{R}^d$, we sample up to $K = 10,000$
-non-padding token representations uniformly across the corpus using reservoir
-sampling (Vitter's Algorithm R). On each sampled token cloud, we compute four
-intrinsic geometric metrics:
+- **EmbeddingGemma:** Evaluated using attention-masked mean pooling, matching
+  Google's official specification (`pooling_mode_mean_tokens: true`).
+- **Qwen3-Embedding:** Evaluated using last-token pooling, matching Alibaba Qwen's
+  official specification (`pooling_mode_lasttoken: true`).
+
+At each layer, we compute the representation matrix $X \in \mathbb{R}^{N \times d}$
+across the $N = 10,000$ parallel sentences. Treating the $N$ row vectors as a
+point cloud $X \subseteq \mathbb{R}^d$, we calculate four intrinsic geometric
+metrics:
 
 ### IsoScore
 
@@ -59,8 +58,8 @@ $X$. The absolute value of this average is subtracted from 1:
 
 $$\text{AvgCos} := 1 - \left| \frac{1}{N} \sum_{i=1}^{N} \frac{x_i \cdot y_i}{\|x_i\| \|y_i\|} \right|$$
 
-A score near 0 represents minimal isotropy (vectors frequently point in similar
-directions, forming a narrow directional cone), while a score near 1 indicates
+A score of 0 represents minimal isotropy (meaning vectors frequently point in
+similar directions, forming an acute directional cone), and a score of 1 indicates
 maximal isotropy.
 
 ### Intrinsic Dimensionality (ID) Score
@@ -74,8 +73,8 @@ ID Score:
 
 $$\text{ID Score} := \frac{\text{ID}(X)}{d}$$
 
-This detects whether transformer layers compress tokens into narrow, low-dimensional
-subspaces.
+We incorporate this metric specifically to detect whether transformer layers
+compress sentences into narrow, low-dimensional language manifolds.
 
 ### Maximum Explainable Variance (MEV)
 
@@ -102,111 +101,116 @@ files.
 
 ![IsoScore](results/figures/isoscore_layerwise.png)
 
-Both models are strongly anisotropic once past the input layer. Gemma sits near
-0.01 across its depth, drops to 0.0012 at penultimate layer 23, and recovers to
-0.033 (English) and 0.044 (Hindi) at final layer 24. Qwen is more extreme: from
-layer 3 onward its IsoScore is practically 0.0000, and it rises sharply only at
-the final layer (0.136 for English, 0.166 for Hindi). The English and Hindi
-curves lie almost on top of each other for both models.
+Both models exhibit pronounced anisotropy through intermediate layers before
+experiencing significant isotropic recovery at the final layer. Gemma starts at
+0.058 (English) and 0.028 (Hindi), drops to 0.0030 at penultimate layer 23, and
+then surges to 0.198 (English) and 0.220 (Hindi) at output layer 24. Qwen starts
+near 0, remains between 0.01 and 0.05 across middle depths, rises to 0.097
+(English) and 0.108 (Hindi) at layer 27, and reaches its maximum at 0.116
+(English) and 0.125 (Hindi) at output layer 28. English and Hindi trajectories
+track each other almost identically throughout.
 
 ### Maximum Explainable Variance (MEV)
 
 ![MEV](results/figures/mev_layerwise.png)
 
-This plot explains Qwen's flat-zero IsoScore. Between layers 3 and 10 a single
-principal component holds around 99.99% of the variance, so the whole token cloud
-collapses onto one axis. This single-axis dominance gradually relaxes in later
-layers and drops to 0.044 (English) and 0.049 (Hindi) at the final layer. Gemma
-never collapses this hard: its MEV swings between roughly 0.20 and 0.84 through
-the network, peaks at penultimate layer 23 ($N-1$) at 0.718 (English) and 0.758
-(Hindi), and falls to 0.186 (English) and 0.152 (Hindi) at final layer 24 ($N$).
+MEV isolates the variance fraction captured by the leading principal component.
+In Gemma, MEV peaks early at layer 1 (0.494 for English, 0.749 for Hindi), settles
+between 0.15 and 0.30 through intermediate layers, spikes at penultimate layer 23
+($N-1$) to 0.547 (English) and 0.612 (Hindi), and then collapses to 0.047
+(English) and 0.037 (Hindi) at final layer 24 ($N$). In Qwen, MEV stays around
+0.15 to 0.20 in early-to-mid layers, steadily declines to 0.066 (English) and
+0.055 (Hindi) at layer 27, and drops to its minimum of 0.051 (English) and 0.041
+(Hindi) at layer 28.
 
 ### Average Random Cosine Similarity (AvgCos)
 
 ![Average Random Cosine Similarity](results/figures/avg_cosine_similarity_layerwise.png)
 
-Values well below 1 mean the tokens point in a shared direction, forming a
-narrow cone. Both models tighten through the middle layers: Gemma dips to its
-minimum at layer 23 (0.061 for English, 0.059 for Hindi, representing peak cone
-formation where cosine similarity reaches ~0.94), while Qwen dips to 0.248
-(English) and 0.347 (Hindi) at layer 27 ($N-1$). At the final output layer, both
-models break the cone open: Gemma surges to 0.910 (English) and 0.903 (Hindi),
-and Qwen surges to 0.773 (English) and 0.830 (Hindi). The output layer is where
-directional dispersion is enforced.
+Values near 0 indicate that sentences collapse into a narrow directional cone,
+where pairwise cosine similarity approaches 1.0. Both models maintain tight
+directional alignment throughout their internal layers: Gemma dips to its
+minimum at layer 23 (0.0037 for English, 0.0029 for Hindi, representing peak
+cone collapse where random sentence cosine similarity reaches 0.9963), while Qwen
+sits between 0.01 and 0.08 across layers 1 to 27. At the final output layer, both
+models break the cone open: Gemma surges to 0.508 (English) and 0.491 (Hindi),
+and Qwen surges to 0.749 (English) and 0.825 (Hindi). The output layer is where
+angular dispersion is enforced.
 
 ### ID Score
 
 ![ID Score](results/figures/id_score_layerwise.png)
 
-Intrinsic dimensionality stays low throughout, a few percent of the hidden size,
-showing that token representations live on a thin manifold at every depth. The
-clearest English-Hindi gap in the study shows up at Qwen's input layer (0.137 for
-English vs 0.002 for Hindi), while intermediate and deep layers remain closely
-aligned across languages.
+Normalized intrinsic dimensionality remains low throughout the network (2% to 6%
+of ambient dimension), demonstrating that sentence representations live on a
+thin manifold at every depth. Gemma displays slightly higher intrinsic
+dimensionality than Qwen through intermediate layers (0.035 to 0.042 vs. 0.022
+to 0.028). English and Hindi curves follow the exact same manifold depth
+trajectory in both models.
 
 ### PCA Compression (3D Point Cloud Progression)
 
-For each model and language combination, we project the unit-normalized token
-representations onto their top three principal components across model depth within
-a fixed shared coordinate frame ($[-0.35, 0.35]$ across all axes). This isolates
-the phenomenon of final-layer normalization and contrastive dispersion by
-deliberately pairing penultimate layer $N-1$ (highlighted in red) directly
-alongside final output layer $N$ (highlighted in green).
+For each model and language combination, we project the unit-normalized sentence
+representations ($\mathbf{u} = \mathbf{s} / \|\mathbf{s}\|_2$) onto their top
+three principal components across model depth within a fixed shared coordinate
+frame ($[-0.35, 0.35]$ across all axes). This directly visualizes the directional
+cone and isolates final-layer normalization by deliberately pairing penultimate
+layer $N-1$ (highlighted in red) directly alongside final output layer $N$
+(highlighted in green).
 
 #### EmbeddingGemma (English)
 
 ![Gemma English PCA compression](results/BPCC_hin_Deva_google_embeddinggemma-300m_en/pca_compression.png)
 
 The input layer displays an isotropic distribution with 3D spatial spread of
-0.2359 and top-3 variance share of 21.1%. Intermediate layers contract steadily:
-spread drops to 0.2635 at layer 6, 0.1436 at layer 12, and 0.1267 at layer 17.
+0.1169 and top-3 variance share of 19.2%. Intermediate layers contract steadily:
+spread drops to 0.0766 at layer 6, 0.0472 at layer 12, and 0.0524 at layer 17.
 At penultimate layer 23 ($N-1$, red), directional collapse reaches its peak,
-compressing into a tight pinpoint knot with a 3D spread of 0.0546. At final
+compressing into a tight pinpoint knot with a 3D spread of 0.0113. At final
 layer 24 ($N$, green), output normalization and contrastive projection burst
-this collapsed state back open into an expansive volume (spread surges to 0.1749).
+this collapsed state back open into an expansive volume (spread surges to 0.1137).
 
 #### EmbeddingGemma (Hindi)
 
 ![Gemma Hindi PCA compression](results/BPCC_hin_Deva_google_embeddinggemma-300m_hi/pca_compression.png)
 
 Hindi mirrors the English trajectory: a wide initial distribution at layer 0
-(spread 0.2146), narrowing across layers 6 to 17 (spread dropping to 0.2469,
-0.1343, and 0.1246). At penultimate layer 23 ($N-1$, red), representations
-collapse into a tiny pinpoint knot with a minimal spread of 0.0609. At final
+(spread 0.1036), narrowing across layers 6 to 17 (spread dropping to 0.0656,
+0.0421, and 0.0504). At penultimate layer 23 ($N-1$, red), representations
+collapse into a tiny pinpoint knot with a minimal spread of 0.0099. At final
 layer 24 ($N$, green), representations burst open into an expansive, spherical
-cloud with spread surging to 0.1850.
+cloud with spread surging to 0.1065.
 
 #### Qwen3-Embedding (English)
 
 ![Qwen English PCA compression](results/BPCC_hin_Deva_Qwen_Qwen3-Embedding-0.6B_en/pca_compression.png)
 
-Qwen displays extreme directional collapse across intermediate layers: spread
-drops from 0.2292 at layer 0 down to 0.1681 at layer 7, 0.1712 at layer 14, and
-0.1587 at layer 20. Penultimate layer 27 ($N-1$, red) reaches maximum compression
-(spread 0.1141). At final layer 28 ($N$, green), the collapsed cone is broken,
-decompressing into a full 3D distribution with spread surging to 0.1697.
+At input layer 0, all sequences share the initial EOS token embedding under
+last-token pooling. Across intermediate layers 7 through 20, sentence embeddings
+form a moderately dense cluster (spread 0.0713 to 0.0937). Penultimate layer 27
+($N-1$, red) tightens to a spread of 0.0500. At final layer 28 ($N$, green), the
+collapsed cone is broken, decompressing into an expansive 3D distribution with
+spread surging to 0.1592.
 
 #### Qwen3-Embedding (Hindi)
 
 ![Qwen Hindi PCA compression](results/BPCC_hin_Deva_Qwen_Qwen3-Embedding-0.6B_hi/pca_compression.png)
 
-Hindi token representations in Qwen follow the same trajectory: spread drops
-from 0.2451 at layer 0 down to 0.1944 at layer 7, 0.1677 at layer 14, and
-reaches peak collapse at penultimate layer 27 ($N-1$, red, spread 0.1158). At
-final layer 28 ($N$, green), the distribution decompresses into an expansive
-volume with spread surging to 0.1594.
+Hindi sentence embeddings in Qwen follow the same path: spread starts at 0.0551
+at layer 7, progresses through layers 14 to 20 (spread 0.0589 to 0.0734), and
+holds at penultimate layer 27 ($N-1$, red, spread 0.0425). At final layer 28
+($N$, green), the distribution decompresses into an expansive volume with spread
+surging to 0.1566.
 
 ## Takeaways
 
-- Both models compress token representations into a narrow, low-dimensional
+- Both models compress sentence representations into a narrow, low-dimensional
   cone across their middle layers and then reopen the space at the output layer.
   This reflects contrastive fine-tuning objectives, which enforce hyperspherical
   uniformity at the output layer for cosine-similarity retrieval.
-- Qwen exhibits acute single-axis collapse (MEV > 99.9%) in its early-to-middle
-  depths before gradually decompressing, whereas Gemma maintains a more moderate
-  variance distribution until an acute spike at penultimate layer 23 ($N-1$).
-- In both architectures, the transition from layer $N-1$ to layer $N$ is where the
-  directional cone is eliminated and spherical isotropy is restored.
+- Both architectures exhibit their sharpest geometric transition between
+  penultimate layer $N-1$ and final layer $N$, where output normalization
+  eliminates dominant rogue axes and restores spherical isotropy.
 - English and Hindi representations display remarkably consistent geometry layer
   by layer across both models, confirming that representation space organization
   is largely language-invariant under parallel semantic content.

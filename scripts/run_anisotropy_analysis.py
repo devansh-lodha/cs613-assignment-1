@@ -1,11 +1,11 @@
-"""Layer-wise isotropy analysis of multilingual embeddings on BPCC (en vs hi).
+"""Layer-wise isotropy analysis of multilingual sentence embeddings on BPCC (en vs hi).
 
 For each model (EmbeddingGemma, Qwen3-Embedding) and each language (English,
 Hindi) drawn from a random parallel subset of BPCC, this script:
 
-1. Collects a token-level point cloud after every transformer layer.
+1. Collects model-native pooled sentence embeddings after every transformer layer.
 2. Computes IsoScore, Average Random Cosine Similarity, ID Score, MEV.
-3. Saves the per-layer point clouds (embeddings) and metrics.
+3. Saves the per-layer sentence embeddings and metrics.
 4. Renders four metric-vs-depth comparison plots (Gemma vs Qwen, en vs hi) and a
    3D PCA-compression plot per (model, language).
 """
@@ -30,9 +30,8 @@ from embedding_gemma.utils import set_seed
 # ------------------------------------------------------------------ config ----
 LANGUAGE_SPLIT = "hin_Deva"
 MAX_SAMPLES = 10_000
-TOKEN_CAP = 10_000
-# Metrics use the full TOKEN_CAP cloud; only a subsample is written to disk to
-# keep the saved embeddings from ballooning (Qwen is 4096-dim, saved as float32).
+# Metrics evaluate all MAX_SAMPLES sentences; up to EMBED_SAVE_CAP are written
+# to disk to keep the saved embeddings from ballooning.
 EMBED_SAVE_CAP = 2_000
 # Cap sequence length: wiki sentences are short, and this bounds hidden-state
 # memory so the 8B model fits a laptop GPU.
@@ -243,7 +242,7 @@ def plot_pca_compression(
 
     plt.suptitle(
         f"{model_label} ({LANGUAGE_LABELS.get(lang, lang)}): "
-        "3D PCA Compression of Token Representations across Depth",
+        "3D PCA Compression of Sentence Embeddings across Depth",
         fontsize=14,
         fontweight="bold",
         y=0.99,
@@ -300,16 +299,12 @@ def main() -> None:
         for lang, texts in texts_by_lang.items():
             print(
                 f"\n  >> {model_label} / {LANGUAGE_LABELS[lang]}: "
-                "collecting token clouds ..."
+                "collecting sentence embeddings ..."
             )
-            layer_clouds = wrapper.collect_layer_token_clouds(
-                texts,
-                max_tokens=TOKEN_CAP,
-                seed=SEED,
-            )
+            layer_clouds = wrapper.collect_layer_sentence_embeddings(texts)
             print(
                 f"     Layers: {len(layer_clouds)} | "
-                f"tokens/layer: {layer_clouds[0].shape[0]} | "
+                f"sentences/layer: {layer_clouds[0].shape[0]} | "
                 f"dim: {layer_clouds[0].shape[1]}"
             )
 
