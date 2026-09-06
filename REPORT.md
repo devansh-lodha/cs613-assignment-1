@@ -100,55 +100,60 @@ English and Hindi exhibit closely aligned manifold dimensions across both models
 
 ### PCA Compression (3D Point Cloud Progression)
 
-For each model and language combination, we project the sentence representations
-onto their top three principal components across model depth, deliberately pairing
-the penultimate layer ($N-1$) directly alongside the final output layer ($N$) to
-isolate the phenomenon of final-layer normalization and contrastive dispersion
-(layers 0, 6, 12, 17, 23, 24 for Gemma; layers 0, 7, 14, 20, 27, 28 for Qwen).
+For each model and language combination, we project the unit-normalized sentence
+representations ($\mathbf{u} = \mathbf{s} / \|\mathbf{s}\|_2$) onto their top
+three principal components across model depth within a fixed shared coordinate
+frame ($[-0.35, 0.35]$ across all axes). This directly visualizes the directional
+cone and isolates the phenomenon of final-layer normalization and contrastive
+dispersion by deliberately pairing penultimate layer $N-1$ directly alongside
+final output layer $N$ (layers 0, 6, 12, 17, 23, 24 for Gemma; layers 0, 7, 14,
+20, 27, 28 for Qwen).
 
 #### EmbeddingGemma (English)
 
 ![Gemma English PCA compression](results/BPCC_hin_Deva_google_embeddinggemma-300m_en/pca_compression.png)
 
-The input layer displays an isotropic distribution with top-3 variance share of
-21.4%. Intermediate layers contract into an elongated cluster (top-3 variance
-reaches 53.9% at layer 6). At penultimate layer 23 ($N-1$), representations
-remain compressed (56.7% top-3 variance) with coordinate magnitudes stretching
-past 10,000 on PC 1. At final layer 24 ($N$), the output normalization and
-contrastive projection redistribute representations into a bounded, spherical
-cloud, dropping top-3 variance share down to 8.9%.
+The input layer displays an isotropic distribution with 3D spatial spread of
+0.1185 and top-3 variance share of 19.6%. Intermediate layers contract steadily:
+spread drops to 0.0756 at layer 6, 0.0496 at layer 12, and 0.0536 at layer 17.
+At penultimate layer 23 ($N-1$, shown in red), directional collapse reaches its
+peak, compressing into a tight pinpoint speck with a 3D spread of 0.0116. At
+final layer 24 ($N$, shown in green), output normalization and contrastive
+projection immediately explode this collapsed state back open into a wide,
+isotropic volume (spread increases tenfold to 0.1171).
 
 #### EmbeddingGemma (Hindi)
 
 ![Gemma Hindi PCA compression](results/BPCC_hin_Deva_google_embeddinggemma-300m_hi/pca_compression.png)
 
-Hindi follows an identical geometric progression: an initial spread at layer 0
-(24.6% top-3 variance), tightening along dominant axes across layers 6 to 17
-(56.4% and 29.5% top-3 variance). At penultimate layer 23 ($N-1$), the sentence
-cloud exhibits severe directional stretching (62.1% top-3 variance). At final
-layer 24 ($N$), output normalization reconstitutes a spherical distribution with
-balanced dispersion, reducing top-3 variance share to 9.3%.
+Hindi mirrors the English trajectory: a wide initial distribution at layer 0
+(spread 0.1038), narrowing across layers 6 to 17 (spread dropping to 0.0641,
+0.0441, and 0.0515). At penultimate layer 23 ($N-1$, red), representations
+collapse into a tiny pinpoint knot with a minimal spread of 0.0102. At final
+layer 24 ($N$, green), representations burst open into an expansive, spherical
+cloud with spread surging to 0.1100.
 
 #### Qwen3-Embedding (English)
 
 ![Qwen English PCA compression](results/BPCC_hin_Deva_Qwen_Qwen3-Embedding-0.6B_en/pca_compression.png)
 
-Qwen displays extreme collapse in early-to-mid layers: at layer 7, top-3
-variance share reaches 100.0%, reflecting the 99.6% single-axis MEV dominance.
-By penultimate layer 27 ($N-1$), the cloud has begun relaxing (41.5% top-3
-variance) but remains elongated. At final layer 28 ($N$), the dominant axis is
-suppressed, and representations expand into 3D volume with top-3 variance share
-dropping to 11.0%.
+Qwen displays extreme directional collapse in early-to-mid layers: at layer 7,
+the entire sentence representation space collapses into a needle-like knot with
+spread falling to 0.0108. The space gradually loosens through layers 14 to 20
+(spread 0.0218 to 0.0451). Penultimate layer 27 ($N-1$, red) remains partially
+compressed (spread 0.0540). At final layer 28 ($N$, green), the collapsed cone is
+completely broken, decompressing into a full 3D distribution with spread
+surging to 0.1527.
 
 #### Qwen3-Embedding (Hindi)
 
 ![Qwen Hindi PCA compression](results/BPCC_hin_Deva_Qwen_Qwen3-Embedding-0.6B_hi/pca_compression.png)
 
-Hindi sentence embeddings in Qwen mirror the English trajectory: a concentrated
-line at layer 7 (98.2% top-3 variance), gradual multi-axis opening through
-layers 14 to 20, and a partially compressed state at penultimate layer 27 ($N-1$,
-20.1% top-3 variance). At final layer 28 ($N$), the cloud opens into a wide,
-isotropic configuration with top-3 variance share falling to 12.0%.
+Hindi sentence embeddings in Qwen follow the same trajectory: a tight knot at
+layer 7 (spread 0.0265), progressing through layers 14 to 20 (spread 0.0396 to
+0.0610), and holding at penultimate layer 27 ($N-1$, red, spread 0.0391). At
+final layer 28 ($N$, green), the distribution decompresses into an expansive
+volume with spread surging to 0.1258.
 
 ## Takeaways
 

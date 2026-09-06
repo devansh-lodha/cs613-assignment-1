@@ -192,19 +192,33 @@ def plot_pca_compression(
         ax = fig.add_subplot(2, 3, panel + 1, projection="3d")
         cloud = layer_clouds[layer_idx].astype(np.float32)
 
-        pca = PCA(n_components=3, svd_solver="randomized", random_state=SEED)
-        proj = pca.fit_transform(cloud - cloud.mean(axis=0))
-        var_share = float(pca.explained_variance_ratio_[:3].sum())
+        # Unit-normalize vectors onto the hypersphere to evaluate directional cone
+        norms = np.linalg.norm(cloud, axis=1, keepdims=True)
+        u = cloud / np.maximum(norms, 1e-12)
 
+        pca = PCA(n_components=3, svd_solver="randomized", random_state=SEED)
+        proj = pca.fit_transform(u - u.mean(axis=0))
+        var_share = float(pca.explained_variance_ratio_[:3].sum())
+        spread = float(np.std(proj, axis=0).mean())
+
+        color = (
+            "#d62728"
+            if layer_idx == num_layers - 2
+            else ("#2ca02c" if layer_idx == num_layers - 1 else "#1f77b4")
+        )
         ax.scatter(
             proj[:, 0],
             proj[:, 1],
             proj[:, 2],
             s=5,
-            alpha=0.25,
-            c="#1f77b4",
+            alpha=0.30,
+            c=color,
             edgecolors="none",
         )
+        ax.set_xlim([-0.35, 0.35])
+        ax.set_ylim([-0.35, 0.35])
+        ax.set_zlim([-0.35, 0.35])
+
         if layer_idx == num_layers - 1:
             title = f"Layer {layer_idx} (Final N)"
         elif layer_idx == num_layers - 2:
@@ -220,9 +234,9 @@ def plot_pca_compression(
         ax.text2D(
             0.03,
             0.95,
-            f"Top-3 var: {var_share:.1%}",
+            f"Spread: {spread:.4f}\nTop-3 var: {var_share:.1%}",
             transform=ax.transAxes,
-            fontsize=9,
+            fontsize=8,
             va="top",
             bbox={"boxstyle": "round,pad=0.2", "fc": "white", "alpha": 0.85},
         )
