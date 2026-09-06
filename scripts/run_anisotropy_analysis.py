@@ -1,335 +1,219 @@
-"""Layer-wise geometric representation and anisotropy analysis on STS-B."""
+"""Layer-wise isotropy analysis of multilingual embeddings on BPCC (en vs hi).
+
+For each model (EmbeddingGemma, Qwen3-Embedding) and each language (English,
+Hindi) drawn from a random parallel subset of BPCC, this script:
+
+1. Collects a token-level point cloud after every transformer layer.
+2. Computes IsoScore, Average Random Cosine Similarity, ID Score, SVD Ratio.
+3. Saves the per-layer point clouds (embeddings) and metrics.
+4. Renders four metric-vs-depth comparison plots (Gemma vs Qwen, en vs hi) and a
+   PCA-compression plot per (model, language).
+"""
 
 import csv
+import gc
 import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import torch.nn.functional as F
+from sklearn.decomposition import PCA
 from tabulate import tabulate
 
 from embedding_gemma.config import ModelConfig
-from embedding_gemma.data import load_stsb_benchmark
-from embedding_gemma.geometry import (
-    LayerGeometryRecord,
-    analyze_layer_geometry,
-)
-from embedding_gemma.model import EmbeddingGemmaWrapper, EmbeddingOutput
+from embedding_gemma.data import load_bpcc_parallel
+from embedding_gemma.geometry import LayerIsotropyRecord, analyze_layer_clouds
+from embedding_gemma.model import EmbeddingGemmaWrapper
 from embedding_gemma.utils import set_seed
 
+# ------------------------------------------------------------------ config ----
+LANGUAGE_SPLIT = "hin_Deva"
+MAX_SAMPLES = 10_000
+TOKEN_CAP = 10_000
+# Metrics use the full TOKEN_CAP cloud; only a subsample is written to disk to
+# keep the saved embeddings from ballooning (Qwen is 4096-dim, saved as float32).
+EMBED_SAVE_CAP = 2_000
+# Cap sequence length: wiki sentences are short, and this bounds hidden-state
+# memory so the 8B model fits a laptop GPU.
+MAX_LENGTH = 128
+SEED = 42
 
-def save_numerical_results(
-    records: list[LayerGeometryRecord],
-    output_dir: Path,
-) -> tuple[Path, Path]:
-    """Persist quantitative geometry records to JSON and CSV formats.
+MODELS: dict[str, str] = {
+    "Gemma": "google/embeddinggemma-300m",
+    "Qwen": "Qwen/Qwen3-Embedding-0.6B",
+}
 
-    Args:
-        records: List of LayerGeometryRecord objects.
-        output_dir: Directory where files will be written.
+# Both models are small enough for a comfortable batch size on a laptop GPU.
+BATCH_SIZES: dict[str, int] = {"Gemma": 16, "Qwen": 16}
 
-    Returns:
-        Tuple of (json_path, csv_path).
+# The four isotropy metrics: (record attribute, human label, higher-is-*).
+METRICS: list[tuple[str, str, str]] = [
+    ("isoscore", "IsoScore", "higher = more isotropic"),
+    (
+        "avg_cosine_similarity",
+        "Avg Random Cosine Similarity",
+        "higher = more isotropic",
+    ),
+    ("id_score", "ID Score (normalized)", "higher = higher intrinsic dim"),
+    ("svd_ratio", "SVD Ratio", "lower = less rogue dominance"),
+]
 
-    """
+# Distinct style per (model, language) series for the comparison plots.
+SERIES_STYLE: dict[tuple[str, str], dict[str, str]] = {
+    ("Gemma", "en"): {"color": "#1f77b4", "linestyle": "-", "marker": "o"},
+    ("Gemma", "hi"): {"color": "#1f77b4", "linestyle": "--", "marker": "s"},
+    ("Qwen", "en"): {"color": "#d62728", "linestyle": "-", "marker": "^"},
+    ("Qwen", "hi"): {"color": "#d62728", "linestyle": "--", "marker": "d"},
+}
+
+LANGUAGE_LABELS = {"en": "English", "hi": "Hindi"}
+
+
+def save_metrics(records: list[LayerIsotropyRecord], output_dir: Path) -> None:
+    """Persist per-layer isotropy metrics as JSON and CSV."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    json_path = output_dir / "stsb_layer_geometry.json"
-    csv_path = output_dir / "stsb_layer_geometry.csv"
-
     dict_records = [r.to_dict() for r in records]
 
-    # Save JSON artifact
-    with json_path.open("w", encoding="utf-8") as f:
+    with (output_dir / "metrics.json").open("w", encoding="utf-8") as f:
         json.dump(dict_records, f, indent=2)
 
-    # Save CSV artifact
-    fieldnames = list(dict_records[0].keys())
-    with csv_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+    with (output_dir / "metrics.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(dict_records[0].keys()))
         writer.writeheader()
         writer.writerows(dict_records)
 
-    return json_path, csv_path
+
+def save_embeddings(layer_clouds: list[np.ndarray], output_dir: Path) -> None:
+    """Save per-layer token point clouds as a compressed float16 npz archive.
+
+    A fixed random subsample (shared across layers) is saved to bound disk usage;
+    the full clouds are still used for the metrics themselves.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    n_tokens = layer_clouds[0].shape[0]
+    if n_tokens > EMBED_SAVE_CAP:
+        rng = np.random.default_rng(SEED)
+        keep = rng.choice(n_tokens, size=EMBED_SAVE_CAP, replace=False)
+        layer_clouds = [cloud[keep] for cloud in layer_clouds]
+
+    # float32 (not float16): some models overflow float16's range, which would
+    # write inf into the saved archive.
+    arrays = {
+        f"layer_{i:02d}": cloud.astype(np.float32)
+        for i, cloud in enumerate(layer_clouds)
+    }
+    # ty flags **dict unpacking against numpy's allow_pickle:bool stub param.
+    np.savez_compressed(output_dir / "embeddings.npz", **arrays)  # ty: ignore[invalid-argument-type]
 
 
-def generate_trajectory_plots(
-    records: list[LayerGeometryRecord],
+def print_metric_table(records: list[LayerIsotropyRecord]) -> None:
+    """Print a per-layer metric summary table to the console."""
+    table = [
+        {
+            "Layer": r.layer_name,
+            "IsoScore": f"{r.isoscore:.4f}",
+            "AvgCos": f"{r.avg_cosine_similarity:.4f}",
+            "ID Score": f"{r.id_score:.4f}",
+            "SVD Ratio": f"{r.svd_ratio:.4f}",
+        }
+        for r in records
+    ]
+    print("\n" + tabulate(table, headers="keys", tablefmt="github"))
+
+
+def plot_metric_comparison(
+    all_records: dict[tuple[str, str], list[LayerIsotropyRecord]],
+    attribute: str,
+    label: str,
+    note: str,
     output_path: Path,
 ) -> None:
-    """Generate and save dual-panel visualization of representation geometry.
+    """Plot one metric vs normalized layer depth across all model/language series.
 
-    Panel 1: Pairwise Cosine Anisotropy (The Cone Angle) and IsoScore.
-    Panel 2: Top Singular Value Variance Share and STS-B Spearman Correlation.
-
-    Args:
-        records: List of LayerGeometryRecord across depth.
-        output_path: Destination image filepath.
-
+    Normalized depth (layer index / final layer) aligns models of different
+    depth (Gemma has fewer layers than Qwen) on a shared x-axis.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    _fig, ax = plt.subplots(figsize=(9, 6), dpi=200)
 
-    layers = [r.layer_index for r in records]
-    anisotropy = [r.cosine_anisotropy for r in records]
-    isoscore = [r.isoscore for r in records]
-    rogue_ratio = [r.rogue_ratio for r in records]
-    spearman = [r.spearman_correlation for r in records]
+    for (model_label, lang), records in all_records.items():
+        depth = len(records) - 1
+        xs = [r.layer_index / depth for r in records] if depth > 0 else [0.0]
+        ys = [getattr(r, attribute) for r in records]
+        style = SERIES_STYLE[(model_label, lang)]
+        ax.plot(
+            xs,
+            ys,
+            linewidth=2,
+            markersize=5,
+            label=f"{model_label} - {LANGUAGE_LABELS.get(lang, lang)}",
+            color=style["color"],
+            linestyle=style["linestyle"],
+            marker=style["marker"],
+        )
 
-    _fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5.5), dpi=300)
-
-    # Panel 1: Directional Cone Formation & IsoScore
-    ax1.plot(
-        layers,
-        anisotropy,
-        marker="o",
-        linewidth=2,
-        color="#d62728",
-        label="Cosine Anisotropy (The Cone)",
-    )
-    ax1.plot(
-        layers,
-        isoscore,
-        marker="s",
-        linewidth=2,
-        color="#1f77b4",
-        label="IsoScore (Isotropy)",
-    )
-    ax1.set_title(
-        "Layer-Wise Cone Formation & Dimensional Variance",
-        fontsize=12,
-        fontweight="bold",
-    )
-    ax1.set_xlabel("Layer Depth (0 = Input Embeddings)", fontsize=11)
-    ax1.set_ylabel("Metric Value", fontsize=11)
-    ax1.set_ylim(-0.05, 1.05)
-    ax1.grid(visible=True, linestyle="--", alpha=0.5)
-    ax1.legend(loc="lower left", framealpha=0.9)
-
-    # Annotate final layer contrastive repair
-    final_layer = layers[-1]
-    repair_text = (
-        f"Contrastive Repair\n"
-        f"Anisotropy: {anisotropy[-1]:.2f}\n"
-        f"IsoScore: {isoscore[-1]:.2f}"
-    )
-    ax1.annotate(
-        repair_text,
-        xy=(final_layer, anisotropy[-1]),
-        xytext=(final_layer - 8, 0.25),
-        arrowprops={"facecolor": "black", "shrink": 0.08, "width": 1, "headwidth": 6},
-        fontsize=9,
-        bbox={"boxstyle": "round,pad=0.3", "fc": "#ffffdd", "ec": "#999999"},
-    )
-
-    # Panel 2: Rogue Dimension Variance & Semantic Correlation
-    ax2.plot(
-        layers,
-        rogue_ratio,
-        marker="^",
-        linewidth=2,
-        color="#ff7f0e",
-        label=r"Top Singular Value Variance Share ($\sigma_1^2 / \sum \sigma^2$)",
-    )
-    ax2.plot(
-        layers,
-        spearman,
-        marker="d",
-        linewidth=2,
-        color="#2ca02c",
-        label=r"STS-B Spearman Rank Correlation ($\rho$)",
-    )
-    ax2.set_title(
-        "Rogue Dimension Dominance vs Downstream STS-B Performance",
-        fontsize=12,
-        fontweight="bold",
-    )
-    ax2.set_xlabel("Layer Depth (0 = Input Embeddings)", fontsize=11)
-    ax2.set_ylabel("Metric Value", fontsize=11)
-    ax2.set_ylim(-0.05, 1.05)
-    ax2.grid(visible=True, linestyle="--", alpha=0.5)
-    ax2.legend(loc="upper left", framealpha=0.9)
-
-    # Annotate peak semantic correlation
-    peak_text = f"Peak Performance\nSpearman: {spearman[-1]:.4f}"
-    ax2.annotate(
-        peak_text,
-        xy=(final_layer, spearman[-1]),
-        xytext=(final_layer - 7, 0.40),
-        arrowprops={"facecolor": "black", "shrink": 0.08, "width": 1, "headwidth": 6},
-        fontsize=9,
-        bbox={"boxstyle": "round,pad=0.3", "fc": "#e6ffe6", "ec": "#66cc66"},
-    )
+    ax.set_title(f"{label} across Layer Depth", fontsize=13, fontweight="bold")
+    ax.set_xlabel("Normalized Layer Depth (0 = input, 1 = final)", fontsize=11)
+    ax.set_ylabel(f"{label}\n({note})", fontsize=11)
+    ax.grid(visible=True, linestyle="--", alpha=0.5)
+    ax.legend(loc="best", framealpha=0.9)
 
     plt.tight_layout()
     plt.savefig(output_path)
     plt.close()
 
 
-def generate_3d_geometry_plots(
-    output_s1: EmbeddingOutput,
-    output_s2: EmbeddingOutput,
+def plot_pca_compression(
+    layer_clouds: list[np.ndarray],
+    model_label: str,
+    lang: str,
     output_path: Path,
-    selected_layers: tuple[int, ...] = (0, 4, 10, 16, 23, 24),
 ) -> None:
-    """Generate 6-panel 3D PCA point cloud showing representation collapse across depth.
+    """Plot 2D PCA projections of the token cloud at layers across model depth.
 
-    Args:
-        output_s1: EmbeddingOutput for sentence 1 corpus.
-        output_s2: EmbeddingOutput for sentence 2 corpus.
-        output_path: Destination image filepath.
-        selected_layers: Tuple of layer indices to display.
-
+    Visualizes how the representation cloud compresses (collapses toward a narrow
+    region) as depth increases, complementing the numeric isotropy metrics.
     """
-    if output_s1.layer_hidden_states is None or output_s2.layer_hidden_states is None:
-        return
-
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    layer_titles = [
-        "Layer 0 (Embeddings)",
-        "Layer 4 (Early Cone)",
-        "Layer 10 (Mid Depth)",
-        "Layer 16 (Late Depth)",
-        "Layer 23 (Peak Cone)",
-        "Layer 24 (Contrastive Repair)",
-    ]
+    num_layers = len(layer_clouds)
+    selected = np.linspace(0, num_layers - 1, 6, dtype=int)
 
-    fig = plt.figure(figsize=(18, 10), dpi=300)
+    _fig, axes = plt.subplots(2, 3, figsize=(15, 9), dpi=200)
+    flat_axes = axes.flatten()
 
-    for idx, (l_idx, title) in enumerate(
-        zip(selected_layers, layer_titles, strict=False),
-    ):
-        ax = fig.add_subplot(2, 3, idx + 1, projection="3d")
+    for panel, layer_idx in enumerate(selected):
+        ax = flat_axes[panel]
+        cloud = layer_clouds[layer_idx].astype(np.float32)
 
-        h = torch.cat(
-            [
-                output_s1.layer_hidden_states[l_idx],
-                output_s2.layer_hidden_states[l_idx],
-            ],
-            dim=0,
-        )
-        h_norm = F.normalize(h.float(), p=2, dim=-1)
+        pca = PCA(n_components=2, svd_solver="randomized", random_state=SEED)
+        proj = pca.fit_transform(cloud - cloud.mean(axis=0))
+        var_share = float(pca.explained_variance_ratio_[:2].sum())
 
-        mean = h_norm.mean(dim=0, keepdim=True)
-        centered = h_norm - mean
-        _u, _s, v = torch.pca_lowrank(centered, q=3)
-        proj = torch.mm(centered, v[:, :3]).numpy()
-
-        color = "#d62728" if l_idx == 23 else ("#2ca02c" if l_idx == 24 else "#1f77b4")
         ax.scatter(
-            proj[:, 0],
-            proj[:, 1],
-            proj[:, 2],
-            alpha=0.35,
-            s=12,
-            c=color,
-            edgecolors="none",
+            proj[:, 0], proj[:, 1], s=6, alpha=0.3, c="#1f77b4", edgecolors="none"
         )
-
-        ax.set_title(title, fontsize=12, fontweight="bold", pad=8)
-        ax.set_xlim([-0.4, 0.4])
-        ax.set_ylim([-0.4, 0.4])
-        ax.set_zlim([-0.4, 0.4])
-        ax.set_xlabel("PC 1", fontsize=9, labelpad=2)
-        ax.set_ylabel("PC 2", fontsize=9, labelpad=2)
-        ax.set_zlabel("PC 3", fontsize=9, labelpad=2)
-        ax.tick_params(labelsize=7)
-
-        spread = float(np.std(proj, axis=0).mean())
-        ax.text2D(
-            0.05,
-            0.90,
-            f"3D Std Spread: {spread:.4f}",
+        ax.set_title(f"Layer {layer_idx}", fontsize=11, fontweight="bold")
+        ax.set_xlabel("PC 1", fontsize=9)
+        ax.set_ylabel("PC 2", fontsize=9)
+        ax.grid(visible=True, linestyle="--", alpha=0.4)
+        ax.text(
+            0.03,
+            0.95,
+            f"Top-2 var: {var_share:.1%}",
             transform=ax.transAxes,
             fontsize=9,
+            va="top",
             bbox={"boxstyle": "round,pad=0.2", "fc": "white", "alpha": 0.85},
         )
 
     plt.suptitle(
-        "EmbeddingGemma Layer-Wise 3D Representation Geometry Progression",
-        fontsize=15,
-        fontweight="bold",
-        y=0.98,
-    )
-    plt.tight_layout()
-    plt.savefig(output_path)
-    plt.close()
-
-
-def generate_cosine_distribution_plots(
-    output_s1: EmbeddingOutput,
-    output_s2: EmbeddingOutput,
-    output_path: Path,
-    selected_layers: tuple[int, ...] = (0, 4, 10, 16, 23, 24),
-) -> None:
-    """Generate multi-panel histograms of pairwise cosine similarities across depth.
-
-    Args:
-        output_s1: EmbeddingOutput for sentence 1 corpus.
-        output_s2: EmbeddingOutput for sentence 2 corpus.
-        output_path: Destination image filepath.
-        selected_layers: Tuple of layer indices to display.
-
-    """
-    if output_s1.layer_hidden_states is None or output_s2.layer_hidden_states is None:
-        return
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    layer_titles = [
-        "Layer 0 (Embeddings)",
-        "Layer 4 (Early Cone)",
-        "Layer 10 (Mid Depth)",
-        "Layer 16 (Late Depth)",
-        "Layer 23 (Peak Cone)",
-        "Layer 24 (Contrastive Repair)",
-    ]
-
-    _fig, axes = plt.subplots(2, 3, figsize=(16, 8), dpi=300)
-    flat_axes = axes.flatten()
-
-    for idx, (l_idx, title) in enumerate(
-        zip(selected_layers, layer_titles, strict=False),
-    ):
-        ax = flat_axes[idx]
-        h1 = output_s1.layer_hidden_states[l_idx]
-        h2 = output_s2.layer_hidden_states[l_idx]
-        h1_norm = F.normalize(h1.float(), p=2, dim=-1)
-        h2_norm = F.normalize(h2.float(), p=2, dim=-1)
-
-        sims = (h1_norm * h2_norm).sum(dim=-1).numpy()
-
-        color = "#d62728" if l_idx == 23 else ("#2ca02c" if l_idx == 24 else "#1f77b4")
-        ax.hist(
-            sims,
-            bins=40,
-            range=(-0.2, 1.0),
-            color=color,
-            alpha=0.75,
-            edgecolor="black",
-            linewidth=0.5,
-            density=True,
-        )
-
-        mean_sim = float(np.mean(sims))
-        ax.axvline(
-            mean_sim,
-            color="black",
-            linestyle="--",
-            linewidth=1.5,
-            label=f"Mean: {mean_sim:.3f}",
-        )
-        ax.set_title(title, fontsize=11, fontweight="bold")
-        ax.set_xlabel("Pairwise Cosine Similarity", fontsize=10)
-        ax.set_ylabel("Density", fontsize=10)
-        ax.set_xlim([-0.2, 1.05])
-        ax.grid(visible=True, linestyle="--", alpha=0.4)
-        ax.legend(loc="upper left", fontsize=9)
-
-    plt.suptitle(
-        "EmbeddingGemma Layer-Wise Pairwise Cosine Similarity Distribution Dynamics",
+        f"{model_label} ({LANGUAGE_LABELS.get(lang, lang)}): "
+        "PCA Compression of Token Cloud across Depth",
         fontsize=14,
         fontweight="bold",
-        y=0.98,
+        y=0.99,
     )
     plt.tight_layout()
     plt.savefig(output_path)
@@ -337,73 +221,104 @@ def generate_cosine_distribution_plots(
 
 
 def main() -> None:
-    """Execute complete layer-wise representation geometry pipeline on STS-B."""
-    set_seed(42)
+    """Run the BPCC layer-wise isotropy analysis for both models and languages."""
+    set_seed(SEED)
 
     output_dir = Path("results")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    figures_dir = output_dir / "figures"
 
     print("=" * 70)
-    print("EmbeddingGemma Layer-Wise Geometric Representation Analysis")
+    print("BPCC Layer-Wise Isotropy Analysis (English vs Hindi)")
     print("=" * 70)
 
-    # Step 1: Load STS-B benchmark test split
-    print("\n[1/4] Loading STS-B benchmark test split...")
-    s1_list, s2_list, gold_scores = load_stsb_benchmark(split="test")
-    print(f"      Loaded {len(s1_list)} sentence pairs with gold human ratings.")
+    print(f"\n[Data] Loading BPCC wiki/{LANGUAGE_SPLIT}.tsv ...")
+    english, hindi = load_bpcc_parallel(
+        language_split=LANGUAGE_SPLIT,
+        max_samples=MAX_SAMPLES,
+        seed=SEED,
+    )
+    print(f"     Loaded {len(english)} parallel English-Hindi pairs.")
+    texts_by_lang = {"en": english, "hi": hindi}
 
-    # Step 2: Initialize model wrapper
-    print("\n[2/4] Initializing EmbeddingGemma model wrapper...")
-    config = ModelConfig(task_type="raw", batch_size=64)
-    wrapper = EmbeddingGemmaWrapper(config)
-    print(f"      Compute device:   {wrapper.device}")
-    print(f"      Numerical dtype:  {wrapper.dtype}")
-    print(f"      Model identifier: {config.model_id}")
+    all_records: dict[tuple[str, str], list[LayerIsotropyRecord]] = {}
 
-    # Step 3: Extract representations across all layers
-    print("\n[3/4] Extracting hidden representations across all 25 layers...")
-    print("      Encoding sentence 1 corpus...")
-    out1 = wrapper.encode(s1_list, return_hidden_states=True, to_cpu=True)
-    print("      Encoding sentence 2 corpus...")
-    out2 = wrapper.encode(s2_list, return_hidden_states=True, to_cpu=True)
+    for model_label, model_id in MODELS.items():
+        print("\n" + "-" * 70)
+        print(f"Model: {model_label} ({model_id})")
+        print("-" * 70)
 
-    # Step 4: Compute geometric and semantic metrics
-    print("\n[4/4] Computing layer-wise geometry metrics...")
-    records = analyze_layer_geometry(out1, out2, gold_scores)
+        config = ModelConfig(
+            model_id=model_id,
+            task_type="raw",
+            batch_size=BATCH_SIZES[model_label],
+            max_length=MAX_LENGTH,
+        )
+        try:
+            wrapper = EmbeddingGemmaWrapper(config)
+        except Exception as exc:  # noqa: BLE001
+            print(f"     [Error] Failed to initialize {model_id}: {exc}")
+            continue
 
-    # Display results table
-    table_data = [
-        {
-            "Layer": r.layer_name,
-            "Cosine Cone (↓)": f"{r.cosine_anisotropy:.4f}",
-            "IsoScore (↑)": f"{r.isoscore:.4f}",
-            "Rogue λ₁ Share (↓)": f"{r.rogue_ratio:.4f}",
-            "STS-B Spearman (↑)": f"{r.spearman_correlation:.4f}",
-        }
-        for r in records
-    ]
-    print("\n" + tabulate(table_data, headers="keys", tablefmt="github"))
+        print(f"     Compute device:  {wrapper.device}")
+        print(f"     Numerical dtype: {wrapper.dtype}")
 
-    # Save quantitative data artifacts
-    json_path, csv_path = save_numerical_results(records, output_dir)
-    print(f"\nSaved quantitative JSON artifact to: {json_path}")
-    print(f"Saved quantitative CSV artifact to:  {csv_path}")
+        for lang, texts in texts_by_lang.items():
+            print(
+                f"\n  >> {model_label} / {LANGUAGE_LABELS[lang]}: "
+                "collecting token clouds ..."
+            )
+            layer_clouds = wrapper.collect_layer_token_clouds(
+                texts,
+                max_tokens=TOKEN_CAP,
+                seed=SEED,
+            )
+            print(
+                f"     Layers: {len(layer_clouds)} | "
+                f"tokens/layer: {layer_clouds[0].shape[0]} | "
+                f"dim: {layer_clouds[0].shape[1]}"
+            )
 
-    # Generate and save visualization figures
-    plot_path = output_dir / "embedding_gemma_cone_analysis.png"
-    generate_trajectory_plots(records, plot_path)
-    print(f"Saved trajectory curves visualization to:  {plot_path}")
+            print("     Computing isotropy metrics ...")
+            records = analyze_layer_clouds(layer_clouds)
+            all_records[(model_label, lang)] = records
 
-    plot_3d_path = output_dir / "embedding_gemma_cone_3d_progression.png"
-    generate_3d_geometry_plots(out1, out2, plot_3d_path)
-    print(f"Saved 3D progression visualization to:      {plot_3d_path}")
+            safe_model = model_id.replace("/", "_")
+            run_dir = output_dir / f"BPCC_{LANGUAGE_SPLIT}_{safe_model}_{lang}"
 
-    plot_dist_path = output_dir / "embedding_gemma_cosine_distributions.png"
-    generate_cosine_distribution_plots(out1, out2, plot_dist_path)
-    print(f"Saved cosine distribution visualization to: {plot_dist_path}")
+            save_metrics(records, run_dir)
+            save_embeddings(layer_clouds, run_dir)
+            plot_pca_compression(
+                layer_clouds,
+                model_label,
+                lang,
+                run_dir / "pca_compression.png",
+            )
+            print_metric_table(records)
+            print(f"     Saved metrics, embeddings, PCA plot -> {run_dir}")
+
+            del layer_clouds
+            gc.collect()
+
+        del wrapper
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
+
+    # ------------------------------------------------ comparison figures ----
+    if all_records:
+        print("\n[Plot] Rendering metric comparison figures ...")
+        for attribute, label, note in METRICS:
+            plot_metric_comparison(
+                all_records,
+                attribute,
+                label,
+                note,
+                figures_dir / f"{attribute}_layerwise.png",
+            )
+        print(f"     Saved 4 metric comparison plots -> {figures_dir}")
 
     print("\n" + "=" * 70)
-    print("Analysis execution completed successfully.")
+    print("Analysis complete.")
     print("=" * 70)
 
 
