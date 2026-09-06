@@ -10,225 +10,225 @@
   {
     "layer_index": 1,
     "layer_name": "1",
-    "isoscore": 0.08248566984147769,
-    "avg_cosine_similarity": 0.7517188440727967,
-    "id_score": 0.021822443795994306,
-    "svd_ratio": 0.06901876021349732
+    "isoscore": 0.0828206898749056,
+    "avg_cosine_similarity": 0.7522113468018436,
+    "id_score": 0.021812855597558106,
+    "svd_ratio": 0.06874561591757189
   },
   {
     "layer_index": 2,
     "layer_name": "2",
-    "isoscore": 0.08958503630845624,
-    "avg_cosine_similarity": 0.6478083860011822,
-    "id_score": 0.019986080074880844,
-    "svd_ratio": 0.05977462581520695
+    "isoscore": 0.0899188300316966,
+    "avg_cosine_similarity": 0.648349741261879,
+    "id_score": 0.020099018784621326,
+    "svd_ratio": 0.059570822075590675
   },
   {
     "layer_index": 3,
     "layer_name": "3",
-    "isoscore": 2.08865411608259e-07,
-    "avg_cosine_similarity": 0.6688004013857713,
-    "id_score": 0.027597646440926795,
-    "svd_ratio": 0.9998931824001789
+    "isoscore": 2.0963519383579316e-07,
+    "avg_cosine_similarity": 0.6692612884237035,
+    "id_score": 0.02791484766700658,
+    "svd_ratio": 0.9998927887822829
   },
   {
     "layer_index": 4,
     "layer_name": "4",
-    "isoscore": 2.835537991322383e-07,
-    "avg_cosine_similarity": 0.6288098060962724,
-    "id_score": 0.021961212181803552,
-    "svd_ratio": 0.9998549936903696
+    "isoscore": 2.8463043128527816e-07,
+    "avg_cosine_similarity": 0.6291723331306222,
+    "id_score": 0.021951372768123357,
+    "svd_ratio": 0.9998544432320768
   },
   {
     "layer_index": 5,
     "layer_name": "5",
-    "isoscore": 3.46033163121254e-07,
-    "avg_cosine_similarity": 0.6138858372108236,
-    "id_score": 0.02180950434206981,
-    "svd_ratio": 0.9998230508879757
+    "isoscore": 3.4749957483385115e-07,
+    "avg_cosine_similarity": 0.6142302259741442,
+    "id_score": 0.021878073601640013,
+    "svd_ratio": 0.9998223012160684
   },
   {
     "layer_index": 6,
     "layer_name": "6",
-    "isoscore": 4.967905566643789e-07,
-    "avg_cosine_similarity": 0.6396638515284752,
-    "id_score": 0.02370510277918454,
-    "svd_ratio": 0.9997459882030061
+    "isoscore": 4.989283167410822e-07,
+    "avg_cosine_similarity": 0.6399899884635234,
+    "id_score": 0.023760087752416354,
+    "svd_ratio": 0.9997448955714294
   },
   {
     "layer_index": 7,
     "layer_name": "7",
-    "isoscore": 5.941255379158484e-07,
-    "avg_cosine_similarity": 0.6460788777297852,
-    "id_score": 0.024802111773324687,
-    "svd_ratio": 0.9996962428985807
+    "isoscore": 5.957296459190052e-07,
+    "avg_cosine_similarity": 0.6463863425544174,
+    "id_score": 0.024827561241573363,
+    "svd_ratio": 0.9996954231436983
   },
   {
     "layer_index": 8,
     "layer_name": "8",
-    "isoscore": 7.056435973778438e-07,
-    "avg_cosine_similarity": 0.6339893347255998,
-    "id_score": 0.026425448266473344,
-    "svd_ratio": 0.9996392579477551
+    "isoscore": 7.073691602052586e-07,
+    "avg_cosine_similarity": 0.6342435113239397,
+    "id_score": 0.026574754056023303,
+    "svd_ratio": 0.9996383762825211
   },
   {
     "layer_index": 9,
     "layer_name": "9",
-    "isoscore": 7.718080726126655e-07,
-    "avg_cosine_similarity": 0.6217567932332857,
-    "id_score": 0.0242851195042658,
-    "svd_ratio": 0.9996054531275856
+    "isoscore": 7.74128908468083e-07,
+    "avg_cosine_similarity": 0.6220350777203612,
+    "id_score": 0.024334439404078582,
+    "svd_ratio": 0.9996042674235421
   },
   {
     "layer_index": 10,
     "layer_name": "10",
-    "isoscore": 9.710788684853676e-07,
-    "avg_cosine_similarity": 0.6192965176096603,
-    "id_score": 0.022893835890320114,
-    "svd_ratio": 0.9995036617755861
+    "isoscore": 9.742788311833586e-07,
+    "avg_cosine_similarity": 0.6193851839511537,
+    "id_score": 0.022823934199323926,
+    "svd_ratio": 0.9995020274282943
   },
   {
     "layer_index": 11,
     "layer_name": "11",
-    "isoscore": 1.3827459004792936e-06,
-    "avg_cosine_similarity": 0.5913508536494092,
-    "id_score": 0.023563315637777655,
-    "svd_ratio": 0.9992934722852649
+    "isoscore": 1.3881822816767898e-06,
+    "avg_cosine_similarity": 0.5907841562526375,
+    "id_score": 0.023570676848833398,
+    "svd_ratio": 0.9992906974586242
   },
   {
     "layer_index": 12,
     "layer_name": "12",
-    "isoscore": 2.054993390534546e-06,
-    "avg_cosine_similarity": 0.586952475566394,
-    "id_score": 0.02329159617683172,
-    "svd_ratio": 0.9989505193530556
+    "isoscore": 2.062298383878562e-06,
+    "avg_cosine_similarity": 0.5867696384696695,
+    "id_score": 0.02330422671916666,
+    "svd_ratio": 0.9989467945832249
   },
   {
     "layer_index": 13,
     "layer_name": "13",
-    "isoscore": 2.175084205182625e-06,
-    "avg_cosine_similarity": 0.5647404464412915,
-    "id_score": 0.023009807149659185,
-    "svd_ratio": 0.9988892907136155
+    "isoscore": 2.1828250839827506e-06,
+    "avg_cosine_similarity": 0.5645374221612238,
+    "id_score": 0.023061554923291934,
+    "svd_ratio": 0.9988853444086532
   },
   {
     "layer_index": 14,
     "layer_name": "14",
-    "isoscore": 2.348548182725792e-06,
-    "avg_cosine_similarity": 0.5542194418681168,
-    "id_score": 0.02395234254247987,
-    "svd_ratio": 0.9988008697531682
+    "isoscore": 2.3568207222112e-06,
+    "avg_cosine_similarity": 0.5540302159522597,
+    "id_score": 0.024048958945922624,
+    "svd_ratio": 0.9987966535281552
   },
   {
     "layer_index": 15,
     "layer_name": "15",
-    "isoscore": 2.435398050785329e-06,
-    "avg_cosine_similarity": 0.5327077449403049,
-    "id_score": 0.023165897052977315,
-    "svd_ratio": 0.9987566087519923
+    "isoscore": 2.444550007334291e-06,
+    "avg_cosine_similarity": 0.5325171044812966,
+    "id_score": 0.023206725047072177,
+    "svd_ratio": 0.9987519449423727
   },
   {
     "layer_index": 16,
     "layer_name": "16",
-    "isoscore": 2.9754035994952923e-06,
-    "avg_cosine_similarity": 0.5180331604542691,
-    "id_score": 0.02361033147896372,
-    "svd_ratio": 0.9984815347521702
+    "isoscore": 2.9855887609250893e-06,
+    "avg_cosine_similarity": 0.5180639792408283,
+    "id_score": 0.023671751623722412,
+    "svd_ratio": 0.9984763486962523
   },
   {
     "layer_index": 17,
     "layer_name": "17",
-    "isoscore": 5.276563318501025e-06,
-    "avg_cosine_similarity": 0.5783101654598506,
-    "id_score": 0.02352415777133474,
-    "svd_ratio": 0.9973118803980221
+    "isoscore": 5.3035332898748445e-06,
+    "avg_cosine_similarity": 0.5779593414329189,
+    "id_score": 0.023621045848717222,
+    "svd_ratio": 0.9972981961258929
   },
   {
     "layer_index": 18,
     "layer_name": "18",
-    "isoscore": 7.343260275544024e-06,
-    "avg_cosine_similarity": 0.5523389152275243,
-    "id_score": 0.02230256723851254,
-    "svd_ratio": 0.9962648863485586
+    "isoscore": 7.381553171939464e-06,
+    "avg_cosine_similarity": 0.5523535450350868,
+    "id_score": 0.022415739267148002,
+    "svd_ratio": 0.9962455180203076
   },
   {
     "layer_index": 19,
     "layer_name": "19",
-    "isoscore": 1.1022625880642026e-05,
-    "avg_cosine_similarity": 0.5557848896006892,
-    "id_score": 0.02085861704745185,
-    "svd_ratio": 0.9944090132128
+    "isoscore": 1.1071347654614125e-05,
+    "avg_cosine_similarity": 0.5561364137416986,
+    "id_score": 0.02087092414850019,
+    "svd_ratio": 0.994384507033159
   },
   {
     "layer_index": 20,
     "layer_name": "20",
-    "isoscore": 1.959302973264803e-05,
-    "avg_cosine_similarity": 0.5826517962081248,
-    "id_score": 0.02072429902714536,
-    "svd_ratio": 0.9901258911616687
+    "isoscore": 1.9670132931030722e-05,
+    "avg_cosine_similarity": 0.5829403258232932,
+    "id_score": 0.020750694971730696,
+    "svd_ratio": 0.9900876067909417
   },
   {
     "layer_index": 21,
     "layer_name": "21",
-    "isoscore": 3.654520384530479e-05,
-    "avg_cosine_similarity": 0.57827209080255,
-    "id_score": 0.021413922152757343,
-    "svd_ratio": 0.981814186390037
+    "isoscore": 3.666508847047595e-05,
+    "avg_cosine_similarity": 0.578191431739928,
+    "id_score": 0.02153635598404927,
+    "svd_ratio": 0.9817561436314638
   },
   {
     "layer_index": 22,
     "layer_name": "22",
-    "isoscore": 5.497803794307122e-05,
-    "avg_cosine_similarity": 0.5325756790102327,
-    "id_score": 0.02094622192672572,
-    "svd_ratio": 0.9730095133572763
+    "isoscore": 5.5123449825708915e-05,
+    "avg_cosine_similarity": 0.532373235920877,
+    "id_score": 0.021038838463672705,
+    "svd_ratio": 0.9729409852603799
   },
   {
     "layer_index": 23,
     "layer_name": "23",
-    "isoscore": 7.51289334061006e-05,
-    "avg_cosine_similarity": 0.4814315712815027,
-    "id_score": 0.02081379971306937,
-    "svd_ratio": 0.9636493710870077
+    "isoscore": 7.53094152383404e-05,
+    "avg_cosine_similarity": 0.4812861516812257,
+    "id_score": 0.020790328355166195,
+    "svd_ratio": 0.9635667465771235
   },
   {
     "layer_index": 24,
     "layer_name": "24",
-    "isoscore": 9.704703716954901e-05,
-    "avg_cosine_similarity": 0.45130194016207503,
-    "id_score": 0.021200427344527095,
-    "svd_ratio": 0.9537669450668247
+    "isoscore": 9.723084532776093e-05,
+    "avg_cosine_similarity": 0.4513532935372392,
+    "id_score": 0.021242617447594987,
+    "svd_ratio": 0.9536853523288462
   },
   {
     "layer_index": 25,
     "layer_name": "25",
-    "isoscore": 0.00011746961390392189,
-    "avg_cosine_similarity": 0.41119876078484097,
-    "id_score": 0.02216657142672145,
-    "svd_ratio": 0.9448252524319927
+    "isoscore": 0.00011763776524604517,
+    "avg_cosine_similarity": 0.4112804633475152,
+    "id_score": 0.022235543392387692,
+    "svd_ratio": 0.9447526723976407
   },
   {
     "layer_index": 26,
     "layer_name": "26",
-    "isoscore": 0.00013803523550109264,
-    "avg_cosine_similarity": 0.36129885059578315,
-    "id_score": 0.02393360926903653,
-    "svd_ratio": 0.9360724806982791
+    "isoscore": 0.0001381681862478075,
+    "avg_cosine_similarity": 0.3613455664304094,
+    "id_score": 0.023918332540829538,
+    "svd_ratio": 0.936016646203273
   },
   {
     "layer_index": 27,
     "layer_name": "27",
-    "isoscore": 0.00015664267374384614,
-    "avg_cosine_similarity": 0.26402162559186426,
-    "id_score": 0.027074008348850882,
-    "svd_ratio": 0.9283460981334789
+    "isoscore": 0.00015652427229718643,
+    "avg_cosine_similarity": 0.26379523270879635,
+    "id_score": 0.02696046200877905,
+    "svd_ratio": 0.9283945926829723
   },
   {
     "layer_index": 28,
     "layer_name": "28",
-    "isoscore": 0.13803179240814667,
-    "avg_cosine_similarity": 0.778150132436606,
-    "id_score": 0.4210756883396613,
-    "svd_ratio": 0.05065147668778952
+    "isoscore": 0.13764239095251593,
+    "avg_cosine_similarity": 0.7786402045573539,
+    "id_score": 0.22958534847814255,
+    "svd_ratio": 0.0509987620349197
   }
 ]

@@ -162,6 +162,8 @@ def plot_metric_comparison(
 
     plt.tight_layout()
     plt.savefig(output_path)
+    if output_path.suffix.lower() != ".pdf":
+        plt.savefig(output_path.with_suffix(".pdf"))
     plt.close()
 
 
@@ -174,11 +176,15 @@ def plot_pca_compression(
     """Plot 3D PCA projections of the token cloud at layers across model depth.
 
     Visualizes how the representation cloud compresses (collapses toward a narrow
-    region) as depth increases, complementing the numeric isotropy metrics.
+    region) as depth increases, explicitly displaying the penultimate layer (N-1)
+    alongside the final layer (N) to demonstrate output-layer normalization and
+    contrastive dispersion.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     num_layers = len(layer_clouds)
-    selected = np.linspace(0, num_layers - 1, 6, dtype=int)
+    # Include depths through penultimate layer (N-1), plus the final layer (N).
+    intermediate = np.round(np.linspace(0, num_layers - 2, 5)).astype(int)
+    selected = np.append(intermediate, num_layers - 1)
 
     fig = plt.figure(figsize=(15, 9), dpi=200)
 
@@ -191,10 +197,21 @@ def plot_pca_compression(
         var_share = float(pca.explained_variance_ratio_[:3].sum())
 
         ax.scatter(
-            proj[:, 0], proj[:, 1], proj[:, 2],
-            s=5, alpha=0.25, c="#1f77b4", edgecolors="none",
+            proj[:, 0],
+            proj[:, 1],
+            proj[:, 2],
+            s=5,
+            alpha=0.25,
+            c="#1f77b4",
+            edgecolors="none",
         )
-        ax.set_title(f"Layer {layer_idx}", fontsize=11, fontweight="bold")
+        if layer_idx == num_layers - 1:
+            title = f"Layer {layer_idx} (Final N)"
+        elif layer_idx == num_layers - 2:
+            title = f"Layer {layer_idx} (N-1)"
+        else:
+            title = f"Layer {layer_idx}"
+        ax.set_title(title, fontsize=11, fontweight="bold")
         ax.set_xlabel("PC 1", fontsize=8, labelpad=1)
         ax.set_ylabel("PC 2", fontsize=8, labelpad=1)
         ax.set_zlabel("PC 3", fontsize=8, labelpad=1)
@@ -219,6 +236,8 @@ def plot_pca_compression(
     )
     plt.tight_layout()
     plt.savefig(output_path)
+    if output_path.suffix.lower() != ".pdf":
+        plt.savefig(output_path.with_suffix(".pdf"))
     plt.close()
 
 
