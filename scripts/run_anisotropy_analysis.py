@@ -1,11 +1,11 @@
-"""Layer-wise isotropy analysis of multilingual sentence embeddings on BPCC (en vs hi).
+"""Layer-wise isotropy analysis of multilingual embeddings on BPCC (en vs hi).
 
 For each model (EmbeddingGemma, Qwen3-Embedding) and each language (English,
 Hindi) drawn from a random parallel subset of BPCC, this script:
 
-1. Collects pooled sentence embeddings after every transformer layer.
+1. Collects a token-level point cloud after every transformer layer.
 2. Computes IsoScore, Average Random Cosine Similarity, ID Score, MEV.
-3. Saves the per-layer sentence embeddings and metrics.
+3. Saves the per-layer point clouds (embeddings) and metrics.
 4. Renders four metric-vs-depth comparison plots (Gemma vs Qwen, en vs hi) and a
    3D PCA-compression plot per (model, language).
 """
@@ -243,7 +243,7 @@ def plot_pca_compression(
 
     plt.suptitle(
         f"{model_label} ({LANGUAGE_LABELS.get(lang, lang)}): "
-        "3D PCA Compression of Sentence Embeddings across Depth",
+        "3D PCA Compression of Token Representations across Depth",
         fontsize=14,
         fontweight="bold",
         y=0.99,
@@ -300,12 +300,16 @@ def main() -> None:
         for lang, texts in texts_by_lang.items():
             print(
                 f"\n  >> {model_label} / {LANGUAGE_LABELS[lang]}: "
-                "collecting sentence embeddings ..."
+                "collecting token clouds ..."
             )
-            layer_clouds = wrapper.collect_layer_sentence_embeddings(texts)
+            layer_clouds = wrapper.collect_layer_token_clouds(
+                texts,
+                max_tokens=TOKEN_CAP,
+                seed=SEED,
+            )
             print(
                 f"     Layers: {len(layer_clouds)} | "
-                f"sentences/layer: {layer_clouds[0].shape[0]} | "
+                f"tokens/layer: {layer_clouds[0].shape[0]} | "
                 f"dim: {layer_clouds[0].shape[1]}"
             )
 

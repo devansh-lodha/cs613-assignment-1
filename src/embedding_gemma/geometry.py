@@ -85,7 +85,7 @@ def _isoscore_from_eigenvalues(eigenvalues: np.ndarray, d_dims: int) -> float:
 
 
 def _mev_from_eigenvalues(eigenvalues: np.ndarray) -> float:
-    """Compute the maximum explained variance ratio (MEV) from eigenvalues."""
+    """Compute Maximum Explainable Variance (MEV): lambda_1 / sum(lambda)."""
     total_variance = float(np.sum(eigenvalues))
     if total_variance <= EPSILON:
         return 0.0
@@ -139,12 +139,16 @@ def compute_avg_cosine_similarity(
 
 
 def compute_mev(embeddings: np.ndarray | torch.Tensor) -> float:
-    """Compute Maximum Explained Variance (MEV): top eigenvalue share.
+    """Compute Maximum Explainable Variance (MEV): lambda_1 / sum_{i=1}^d lambda_i.
 
-    Calculates ``lambda_1 / sum(lambda)``, isolating the fraction of variance
-    captured by the single dominant "rogue" direction (formerly referred to as SVD
-    ratio). A high value signals that one dimension absorbs a disproportionate
-    share of the representational capacity.
+    While the IsoScore evaluates the overall distribution of variance across the
+    representation space, transformer embeddings frequently suffer from severe
+    anisotropy driven by a single dominant rogue dimension. To explicitly measure
+    this phenomenon, we compute the MEV. It isolates the variance captured by
+    the top principal component (the largest eigenvalue lambda_1) and divides it
+    by the sum of all eigenvalues. A high MEV indicates that a single rogue
+    dimension is absorbing a disproportionate amount of the representational
+    capacity.
     """
     x = _to_numpy(embeddings)
     if x.shape[0] <= 1:
