@@ -2,3 +2,7 @@
 __pycache__/
 *.py[cod]
 .ruff_cache/
+
+# Saved embedding point clouds are large binary artifacts; regenerate via
+# scripts/run_anisotropy_analysis.py rather than committing them.
+*.npz

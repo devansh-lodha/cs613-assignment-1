@@ -5,12 +5,60 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from transformers import AutoModel, AutoTokenizer, BitsAndBytesConfig
 
 from embedding_gemma.config import ModelConfig
 from embedding_gemma.device import get_optimal_device, get_optimal_dtype
+
+
+def _reservoir_plan(
+    seen: int,
+    filled: int,
+    n_incoming: int,
+    capacity: int,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray, int]:
+    """Plan reservoir slot assignments for a batch of incoming items.
+
+    Implements Vitter's Algorithm R: the first ``capacity`` items fill the
+    reservoir, and each subsequent item ``c`` (0-indexed global count) replaces a
+    uniformly random existing slot with probability ``capacity / (c + 1)``.
+
+    Args:
+        seen: Number of items already streamed before this batch.
+        filled: Number of reservoir slots currently occupied.
+        n_incoming: Number of items in the incoming batch.
+        capacity: Reservoir capacity.
+        rng: Random generator for reproducible sampling.
+
+    Returns:
+        Tuple ``(dst_slots, src_indices, new_filled)`` where ``dst_slots`` are
+        reservoir positions to overwrite and ``src_indices`` are the matching
+        positions within the incoming batch.
+
+    """
+    dst: list[int] = []
+    src: list[int] = []
+
+    fill_here = min(capacity - filled, n_incoming)
+    if fill_here > 0:
+        dst.extend(range(filled, filled + fill_here))
+        src.extend(range(fill_here))
+        filled += fill_here
+
+    remaining = n_incoming - fill_here
+    if remaining > 0:
+        offset = fill_here
+        global_counts = np.arange(seen + offset, seen + n_incoming)
+        draws = rng.integers(0, global_counts + 1)
+        accepted = draws < capacity
+        dst.extend(draws[accepted].tolist())
+        src.extend((np.arange(offset, n_incoming)[accepted]).tolist())
+
+    return np.asarray(dst, dtype=np.int64), np.asarray(src, dtype=np.int64), filled
 
 
 @dataclass
@@ -29,7 +77,6 @@ class EmbeddingOutput:
 
     embeddings: torch.Tensor
     layer_hidden_states: list[torch.Tensor] | None = None
-
 
 
 class EmbeddingGemmaWrapper:
@@ -79,7 +126,6 @@ class EmbeddingGemmaWrapper:
             pad_str = self.tokenizer.convert_ids_to_tokens(0)
             if isinstance(pad_str, str):
                 self.tokenizer.pad_token = pad_str
-
 
         # Load the model using 4-bit quantization to reduce VRAM usage.
         quant_config = BitsAndBytesConfig(
@@ -368,6 +414,84 @@ class EmbeddingGemmaWrapper:
             embeddings=final_embeddings,
             layer_hidden_states=final_layers,
         )
+
+    def collect_layer_token_clouds(
+        self,
+        texts: Sequence[str],
+        max_tokens: int = 10_000,
+        seed: int = 42,
+    ) -> list[np.ndarray]:
+        """Collect a reservoir-sampled token point cloud for every layer.
+
+        Runs the model over ``texts`` and, at each layer, gathers the hidden
+        representations of real (non-padding) tokens into a bounded reservoir of
+        at most ``max_tokens`` vectors. The same token positions are retained
+        across all layers, so per-layer clouds describe the trajectory of one
+        consistent set of tokens through model depth.
+
+        Args:
+            texts: Input sentences to encode.
+            max_tokens: Maximum number of token vectors retained per layer.
+            seed: Seed controlling the reproducible reservoir sampling.
+
+        Returns:
+            List indexed by layer (0 = input embeddings), each a float32 array of
+            shape ``(n, hidden_dim)`` with ``n <= max_tokens``.
+
+        """
+        rng = np.random.default_rng(seed)
+        buffers: list[np.ndarray] | None = None
+        filled = 0
+        seen = 0
+
+        with torch.inference_mode():
+            for i in range(0, len(texts), self.config.batch_size):
+                batch = texts[i : i + self.config.batch_size]
+                inputs = self._tokenize_batch(batch)
+                output = self.model(**inputs, output_hidden_states=True)
+
+                # Flatten (batch, seq) mask to index into flattened token axis.
+                flat_mask = inputs["attention_mask"].reshape(-1).bool()
+                hidden_states = output.hidden_states
+                if hidden_states is None:
+                    continue
+
+                n_tokens = int(flat_mask.sum().item())
+                if n_tokens == 0:
+                    continue
+
+                # Extract real-token vectors per layer as CPU float32 arrays.
+                # float32 (not float16) is required: some models (e.g. Gemma)
+                # produce activation magnitudes that overflow float16's 65504 max.
+                layer_tokens: list[np.ndarray] = []
+                for layer_tensor in hidden_states:
+                    flat = layer_tensor.reshape(-1, layer_tensor.size(-1))
+                    tokens = flat[flat_mask].to(torch.float32).cpu().numpy()
+                    layer_tokens.append(tokens)
+
+                if buffers is None:
+                    hidden_dim = layer_tokens[0].shape[1]
+                    buffers = [
+                        np.empty((max_tokens, hidden_dim), dtype=np.float32)
+                        for _ in layer_tokens
+                    ]
+
+                dst, src, filled = _reservoir_plan(
+                    seen,
+                    filled,
+                    n_tokens,
+                    max_tokens,
+                    rng,
+                )
+                if dst.size > 0:
+                    for buf, tokens in zip(buffers, layer_tokens, strict=True):
+                        buf[dst] = tokens[src]
+
+                seen += n_tokens
+
+        if buffers is None:
+            return []
+        return [buf[:filled] for buf in buffers]
 
     def stream_encode(
         self,
