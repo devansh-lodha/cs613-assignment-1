@@ -14,6 +14,7 @@ from embedding_gemma.config import ModelConfig
 from embedding_gemma.device import get_optimal_device, get_optimal_dtype
 
 
+# [AUXILIARY / VERIFY]: Container used by encode() and stream_encode() in verify.py.
 @dataclass
 class EmbeddingOutput:
     """Container holding final pooled embeddings and optional layer states.
@@ -98,6 +99,7 @@ class EmbeddingGemmaWrapper:
         if self.model.config.pad_token_id is None:
             self.model.config.pad_token_id = self.tokenizer.pad_token_id
 
+    # [AUXILIARY / RETRIEVAL]: Used when task_type is 'query'/'document'; no-op in raw.
     def format_text(self, text: str) -> str:
         """Apply task-specific instruction prefixes for the configured task type.
 
@@ -164,6 +166,7 @@ class EmbeddingGemmaWrapper:
         pooled = sum_embeddings / sum_mask
         return pooled.to(self.dtype)
 
+    # [AUXILIARY / INFERENCE]: L2 normalization applied to final retrieval vectors.
     def _normalize_if_enabled(self, tensor: torch.Tensor) -> torch.Tensor:
         """Project vectors onto the unit Euclidean sphere (L2 norm = 1.0) if enabled.
 
@@ -224,6 +227,7 @@ class EmbeddingGemmaWrapper:
             return pooled.to(self.dtype)
         return self._mean_pool(hidden_state, attention_mask)
 
+    # [AUXILIARY / ENCODE]: Helper for encode() and stream_encode().
     def _extract_layer_representations(
         self,
         hidden_states: tuple[torch.Tensor, ...],
@@ -249,6 +253,7 @@ class EmbeddingGemmaWrapper:
             layer_outputs.append(layer_pooled)
         return layer_outputs
 
+    # [AUXILIARY / ENCODE]: Helper for encode() and stream_encode().
     def _process_batch(
         self,
         batch_texts: Sequence[str],
@@ -299,6 +304,7 @@ class EmbeddingGemmaWrapper:
             layer_hidden_states=pooled_layers,
         )
 
+    # [AUXILIARY / VERIFY]: General-purpose PyTorch tensor encoder (scripts/verify.py).
     def encode(
         self,
         texts: Sequence[str],
@@ -382,6 +388,7 @@ class EmbeddingGemmaWrapper:
             layer_hidden_states=final_layers,
         )
 
+    # [CORE EXPERIMENT PIPELINE]: Primary method used by run_anisotropy_analysis.py.
     def collect_layer_sentence_embeddings(
         self,
         texts: Sequence[str],
@@ -429,6 +436,7 @@ class EmbeddingGemmaWrapper:
             return []
         return [np.concatenate(batches, axis=0) for batches in layer_batches]
 
+    # [AUXILIARY / STREAMING]: Memory-efficient generator encoder (scripts/verify.py).
     def stream_encode(
         self,
         texts: Sequence[str],
